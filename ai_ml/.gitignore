@@ -22,7 +22,10 @@ Thumbs.db
 .DS_Store
 
 # Data and models (local only)
-data/
+data/raw/
+data/processed/
+data/ground_truth/*
+!data/ground_truth/sample_metadata.json
 models/
 *.png
 *.jpg
