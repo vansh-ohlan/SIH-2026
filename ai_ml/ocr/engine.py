@@ -1,13 +1,10 @@
-"""OCR engine placeholder."""
+"""OCR engine interface.
 
+This module re-exports the OCR engine base class and provides a simple
+placeholder for direct use. Actual engine implementations (PaddleOCR,
+Tesseract) should subclass OCREngine from base.py.
+"""
 
-def recognize(image) -> str:
-    """Run OCR on an image and return raw text.
+from ai_ml.ocr.base import OCREngine
 
-    Args:
-        image: Input image object.
-
-    Returns:
-        Raw OCR text.
-    """
-    raise NotImplementedError("OCR engine not yet implemented.")
+__all__ = ["OCREngine"]
