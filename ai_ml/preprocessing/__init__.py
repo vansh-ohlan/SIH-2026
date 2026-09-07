@@ -1,1 +1,1 @@
-"""Image preprocessing subpackage."""
+"""Preprocessing subpackage for scanned RoR documents."""
