@@ -2,8 +2,7 @@
 
 This module defines the OCR abstraction for the AI/ML pipeline. It provides
 a clean engine interface, structured result schemas, and configuration so that
-the actual OCR engine (planned: PaddleOCR, with Tesseract as a future fallback)
-can be plugged in without changing the rest of the pipeline.
+the actual OCR engine can be plugged in without changing the rest of the pipeline.
 
 ## Architecture
 
@@ -43,8 +42,10 @@ class MyEngine(OCREngine):
         ...
 ```
 
-The interface is engine-agnostic. PaddleOCR and Tesseract adapters will be
-implemented as separate subclasses.
+The interface is engine-agnostic. The current implementation includes:
+
+- `PaddleOCREngine` — primary adapter for PaddleOCR 3.x
+- Future: Tesseract adapter
 
 ## Configuration
 
@@ -54,8 +55,93 @@ implemented as separate subclasses.
 - `confidence_threshold`: minimum confidence to retain words
 - `require_bboxes`: whether bounding boxes are required
 - `retain_raw_output`: whether to keep raw engine output in `raw_metadata`
-- `device`: optional CPU/GPU preference
+- `device`: optional CPU/GPU preference, default `None` (CPU)
 - `document_id`: optional document identifier for tracing
+
+## PaddleOCR Integration
+
+### Dependency Installation
+
+```bash
+pip install paddleocr
+```
+
+PaddleOCR will pull in the required PaddlePaddle runtime automatically.
+
+For CPU-only Windows environments, PaddlePaddle CPU wheels are available via
+PyPI. If automatic resolution fails, install PaddlePaddle CPU explicitly:
+
+```bash
+python -m pip install paddlepaddle -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
+```
+
+### First-Run Behavior
+
+On first use, PaddleOCR automatically downloads the required pre-trained models
+from HuggingFace or its model zoo. This requires an internet connection and may
+take several minutes depending on the model size. Subsequent runs use the cached
+models.
+
+### Hindi / Devanagari Support
+
+The PaddleOCR adapter defaults to `lang="hi"` (Hindi). The language mapping is:
+
+| Our language code | PaddleOCR lang value |
+|---|---|
+| `hi` | `hi` |
+| `en` | `en` |
+| `hi+en` | `hi+en` |
+| `latin` | `latin` |
+| `devanagari` | `devanagari` |
+
+Mixed-language documents (Hindi + English + numeric) are handled by PaddleOCR's
+multilingual models where supported. If an unsupported language code is passed,
+it is forwarded as-is to PaddleOCR, which may fall back to its default behavior.
+
+### CPU-First Execution
+
+The adapter defaults to CPU inference (`use_gpu=False`). GPU can be enabled by
+setting `OCRConfig(device="gpu")`, but this requires `paddlepaddle-gpu` and is
+not tested in this project.
+
+### OCR Output Mapping
+
+PaddleOCR 3.x `predict()` returns a list of page result objects. Each result
+contains:
+
+- `rec_texts`: list of recognized text strings (line-level)
+- `rec_boxes`: list of bounding boxes (quadrilateral `[[x1,y1],[x2,y2],[x3,y3],[x4,y4]]`)
+- `rec_scores`: list of confidence floats in `[0.0, 1.0]`
+- `rec_polys`: numpy array of polygon points (preserved in `raw_metadata` when enabled)
+
+The adapter maps these to our schema as:
+
+- Each PaddleOCR text entry → `OCRLine` containing a single `OCRWord`
+- Quadrilateral boxes → axis-aligned `(x1, y1, x2, y2)` bounding rectangles
+- Confidence values are validated and clamped to `[0.0, 1.0]`
+
+### Lazy / Optional Import
+
+`import ai_ml.ocr` does **not** require PaddleOCR to be installed. PaddleOCR
+is imported only when `PaddleOCREngine` is instantiated or its `recognize()`
+method is called. This keeps architecture tests independent of the heavy OCR
+runtime.
+
+### Error Handling
+
+- `OCREngineUnavailableError` — PaddleOCR package not installed or initialization failed
+- `OCRImageError` — invalid input image (None, empty array, non-ndarray)
+- `OCRInferenceError` — inference failure or empty engine result
+- `OCRParsingError` — malformed or unexpected PaddleOCR output structure
+
+### Limitations
+
+- The adapter targets PaddleOCR 3.x. Older versions may have incompatible APIs.
+- PaddleOCR line-level output is mapped to single-word `OCRLine`s; true word-level
+  segmentation is not currently available from the pipeline output.
+- Table structure detection is not implemented here; use PP-StructureV3 for that.
+- Model downloads require internet access on first run.
+- GPU execution is not tested.
 
 ## Hindi-First Design
 
@@ -64,7 +150,7 @@ The architecture explicitly supports Hindi/Devanagari as the primary script:
 - Default languages include `"hi"`.
 - `OCRWord.language` allows per-word script detection.
 - The schema does not assume Latin-only text.
-- Future engines must preserve Devanagari characters and conjuncts.
+- Engines must preserve Devanagari characters and conjuncts.
 
 ## Layout Preservation
 
@@ -89,21 +175,13 @@ OCR recognition and post-processing are kept separate:
 ```python
 from ai_ml.ocr import OCREngine, OCRConfig, postprocess
 
-engine = MyEngine()
+engine = PaddleOCREngine()
 raw_result = engine.recognize(image, config)
 clean_result = postprocess(raw_result, config)
 ```
 
 Post-processing currently returns the result unchanged. Future implementations
 may add word merging, numeral normalization, and reading-order correction.
-
-## Planned Integrations
-
-- **Primary:** PaddleOCR (strong Devanagari support, layout analysis)
-- **Fallback:** Tesseract 5+ with Hindi language pack
-
-Neither engine is a current dependency. The abstraction is designed so that
-adding either engine requires only a new subclass of `OCREngine`.
 
 ## Error Handling
 
@@ -118,8 +196,8 @@ Errors are never silently swallowed.
 
 ## What Is Intentionally Not Implemented Yet
 
-- Actual OCR inference
-- PaddleOCR or Tesseract adapters
+- Actual OCR inference (beyond the PaddleOCR adapter interface)
+- Tesseract adapter
 - Layout/table extraction
 - Field-level confidence scoring
 - Devanagari-specific post-processing rules
