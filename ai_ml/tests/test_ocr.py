@@ -409,3 +409,207 @@ class TestPaddleOCREngineOutputConversion:
         assert engine._resolve_language(["hi", "en"]) == "hi"
         assert engine._resolve_language([]) == "hi"
         assert engine._resolve_language(["latin"]) == "latin"
+
+
+# ---------------------------------------------------------------------------
+# Post-processing tests
+# ---------------------------------------------------------------------------
+
+
+def _make_result(words) -> OCRResult:
+    """Helper to build a minimal OCRResult from a list of (text, confidence, bbox)."""
+    word_objs = []
+    for idx, (text, confidence, bbox) in enumerate(words, start=1):
+        word_objs.append(
+            OCRWord(
+                text=text,
+                confidence=confidence,
+                bbox=bbox,
+                language="hi" if any("\u0900" <= ch <= "\u097F" for ch in text) else "en",
+            )
+        )
+    line = OCRLine(line_id="line-1", words=word_objs, bbox=(0, 0, 100, 100))
+    block = OCRBlock(block_id="block-1", lines=[line], bbox=(0, 0, 100, 100))
+    page = OCRPage(page_number=1, blocks=[block], width=100, height=100)
+    return OCRResult(pages=[page], engine_name="test", language="hi")
+
+
+class TestPostprocessUnicodeNormalization:
+    def test_nfc_normalization(self) -> None:
+        result = _make_result([("नमस्ते", 0.9, (0, 0, 10, 20))])
+        processed = postprocess(result)
+        word = processed.pages[0].blocks[0].lines[0].words[0]
+        assert word.text == "नमस्ते"
+
+    def test_mixed_hindi_english_preserved(self) -> None:
+        result = _make_result([("जिला Jaipur", 0.9, (0, 0, 10, 20))])
+        processed = postprocess(result)
+        word = processed.pages[0].blocks[0].lines[0].words[0]
+        assert "जिला" in word.text
+        assert "Jaipur" in word.text
+
+    def test_devanagari_not_transliterated(self) -> None:
+        result = _make_result([("खसरा", 0.9, (0, 0, 10, 20))])
+        processed = postprocess(result)
+        word = processed.pages[0].blocks[0].lines[0].words[0]
+        assert word.text == "खसरा"
+
+
+class TestPostprocessWhitespace:
+    def test_repeated_spaces_collapsed(self) -> None:
+        result = _make_result([("नमस्ते   दुनिया", 0.9, (0, 0, 10, 20))])
+        processed = postprocess(result)
+        word = processed.pages[0].blocks[0].lines[0].words[0]
+        assert word.text == "नमस्ते दुनिया"
+
+    def test_leading_trailing_whitespace_removed(self) -> None:
+        result = _make_result([("  नमस्ते  ", 0.9, (0, 0, 10, 20))])
+        processed = postprocess(result)
+        word = processed.pages[0].blocks[0].lines[0].words[0]
+        assert word.text == "नमस्ते"
+
+    def test_newline_normalized(self) -> None:
+        result = _make_result([("नमस्ते\nदुनिया", 0.9, (0, 0, 10, 20))])
+        processed = postprocess(result)
+        word = processed.pages[0].blocks[0].lines[0].words[0]
+        assert "\n" not in word.text
+        assert word.text == "नमस्ते दुनिया"
+
+
+class TestPostprocessPunctuation:
+    def test_repeated_punctuation_collapsed(self) -> None:
+        result = _make_result([("विवरण!!", 0.9, (0, 0, 10, 20))])
+        processed = postprocess(result)
+        word = processed.pages[0].blocks[0].lines[0].words[0]
+        assert word.text == "विवरण!"
+
+    def test_numeric_slash_preserved(self) -> None:
+        result = _make_result([("142/1", 0.9, (0, 0, 10, 20))])
+        processed = postprocess(result)
+        word = processed.pages[0].blocks[0].lines[0].words[0]
+        assert word.text == "142/1"
+
+    def test_numeric_hyphen_preserved(self) -> None:
+        result = _make_result([("2-5-10", 0.9, (0, 0, 10, 20))])
+        processed = postprocess(result)
+        word = processed.pages[0].blocks[0].lines[0].words[0]
+        assert word.text == "2-5-10"
+
+
+class TestPostprocessNumericPreservation:
+    def test_integer_preserved(self) -> None:
+        result = _make_result([("123", 0.9, (0, 0, 10, 20))])
+        processed = postprocess(result)
+        word = processed.pages[0].blocks[0].lines[0].words[0]
+        assert word.text == "123"
+
+    def test_decimal_preserved(self) -> None:
+        result = _make_result([("2.5", 0.9, (0, 0, 10, 20))])
+        processed = postprocess(result)
+        word = processed.pages[0].blocks[0].lines[0].words[0]
+        assert word.text == "2.5"
+
+    def test_fraction_slash_preserved(self) -> None:
+        result = _make_result([("1/2", 0.9, (0, 0, 10, 20))])
+        processed = postprocess(result)
+        word = processed.pages[0].blocks[0].lines[0].words[0]
+        assert word.text == "1/2"
+
+    def test_khasra_number_preserved(self) -> None:
+        result = _make_result([("247/2/3", 0.9, (0, 0, 10, 20))])
+        processed = postprocess(result)
+        word = processed.pages[0].blocks[0].lines[0].words[0]
+        assert word.text == "247/2/3"
+
+
+class TestPostprocessEmptyElements:
+    def test_empty_word_removed(self) -> None:
+        result = _make_result([("नमस्ते", 0.9, (0, 0, 10, 20)), ("", 0.5, (10, 0, 20, 20))])
+        processed = postprocess(result)
+        words = processed.pages[0].blocks[0].lines[0].words
+        assert len(words) == 1
+        assert words[0].text == "नमस्ते"
+
+    def test_whitespace_only_word_removed(self) -> None:
+        result = _make_result([("नमस्ते", 0.9, (0, 0, 10, 20)), ("   ", 0.5, (10, 0, 20, 20))])
+        processed = postprocess(result)
+        words = processed.pages[0].blocks[0].lines[0].words
+        assert len(words) == 1
+
+    def test_empty_line_removed(self) -> None:
+        words = [OCRWord(text="", confidence=0.5, bbox=(0, 0, 10, 20))]
+        line = OCRLine(line_id="line-empty", words=words, bbox=(0, 0, 10, 20))
+        block = OCRBlock(block_id="block-1", lines=[line], bbox=(0, 0, 10, 20))
+        page = OCRPage(page_number=1, blocks=[block], width=100, height=100)
+        result = OCRResult(pages=[page], engine_name="test", language="hi")
+        processed = postprocess(result)
+        assert len(processed.pages) == 1
+        assert len(processed.pages[0].blocks) == 1
+        assert len(processed.pages[0].blocks[0].lines) == 1
+        assert processed.pages[0].blocks[0].lines[0].words == []
+
+
+class TestPostprocessConfidence:
+    def test_confidence_preserved(self) -> None:
+        result = _make_result([("नमस्ते", 0.87, (0, 0, 10, 20))])
+        processed = postprocess(result)
+        word = processed.pages[0].blocks[0].lines[0].words[0]
+        assert word.confidence == 0.87
+
+    def test_none_confidence_preserved(self) -> None:
+        result = _make_result([("नमस्ते", None, (0, 0, 10, 20))])
+        processed = postprocess(result)
+        word = processed.pages[0].blocks[0].lines[0].words[0]
+        assert word.confidence is None
+
+
+class TestPostprocessBoundingBox:
+    def test_bbox_preserved(self) -> None:
+        bbox = (5, 10, 15, 30)
+        result = _make_result([("नमस्ते", 0.9, bbox)])
+        processed = postprocess(result)
+        word = processed.pages[0].blocks[0].lines[0].words[0]
+        assert word.bbox == bbox
+
+    def test_page_dimensions_preserved(self) -> None:
+        result = _make_result([("नमस्ते", 0.9, (0, 0, 10, 20))])
+        processed = postprocess(result)
+        page = processed.pages[0]
+        assert page.width == 100
+        assert page.height == 100
+        assert page.page_number == 1
+
+
+class TestPostprocessOriginalTextAuditability:
+    def test_original_text_preserved_when_changed(self) -> None:
+        result = _make_result([("नमस्ते   दुनिया", 0.9, (0, 0, 10, 20))])
+        processed = postprocess(result)
+        word = processed.pages[0].blocks[0].lines[0].words[0]
+        assert word.text == "नमस्ते दुनिया"
+        assert word.original_text == "नमस्ते   दुनिया"
+
+    def test_original_text_none_when_unchanged(self) -> None:
+        result = _make_result([("नमस्ते", 0.9, (0, 0, 10, 20))])
+        processed = postprocess(result)
+        word = processed.pages[0].blocks[0].lines[0].words[0]
+        assert word.text == "नमस्ते"
+        assert word.original_text is None
+
+    def test_original_text_can_be_disabled(self) -> None:
+        from ai_ml.ocr.postprocess import PostprocessConfig
+        result = _make_result([("नमस्ते   दुनिया", 0.9, (0, 0, 10, 20))])
+        config = PostprocessConfig(retain_original_text=False)
+        processed = postprocess(result, config=config)
+        word = processed.pages[0].blocks[0].lines[0].words[0]
+        assert word.original_text is None
+
+
+class TestPostprocessIdempotence:
+    def test_double_postprocess_is_stable(self) -> None:
+        result = _make_result([("नमस्ते   दुनिया", 0.9, (0, 0, 10, 20))])
+        processed_once = postprocess(result)
+        processed_twice = postprocess(processed_once)
+        word1 = processed_once.pages[0].blocks[0].lines[0].words[0]
+        word2 = processed_twice.pages[0].blocks[0].lines[0].words[0]
+        assert word1.text == word2.text
+        assert word1.confidence == word2.confidence
