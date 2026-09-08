@@ -110,7 +110,64 @@ Planned strategies:
 - **Table-aware** — exploit table structure from PP-StructureV3 or similar
 - **ML/LLM-assisted** — future enhancement using trained models
 
-No strategy is implemented in this task.
+### Label-Based Extraction (`LabelExtractor`)
+
+The first implemented strategy is deterministic label-based extraction.
+
+#### What it does
+
+- Scans OCR text for known Hindi/English field labels.
+- Extracts values from the same line after the label, or from the immediately following line.
+- Creates `ExtractedField` objects with full provenance metadata.
+- Supports multiple pages, repeated labels, and mixed Hindi/English text.
+
+#### Supported labels
+
+| Field | English variants | Hindi variants |
+|---|---|---|
+| state | state | राज्य |
+| district | district | जिला |
+| tehsil | tehsil | तहसील |
+| village | village | ग्राम |
+| year | year | साल |
+| khata_number | khata number | खाता संख्या |
+| khewat_number | khewat number | खेवट संख्या |
+| khatoni_number | khatoni number | खतौनी संख्या |
+| khasra_number | khasra number | खसरा संख्या |
+| landholder_name | name of owner | खातेदार का नाम |
+| father_or_husband_name | father name | पिता का नाम |
+| address | address | पता |
+| area | area | रकबा |
+| land_classification | land classification | सामाजिक वर्गीकरण |
+| irrigation_source | irrigation source | सिंचाई का स्रोत |
+| revenue | revenue | राजस्व |
+| mutation_number | mutation number | नामांतरण संख्या |
+| mutation_details | mutation details | नामांतरण विवरण |
+| remarks | remarks | विवरण |
+
+#### What it intentionally does NOT do
+
+- Does not perform fuzzy matching.
+- Does not guess values when labels are ambiguous.
+- Does not parse tables or rely on spatial layout.
+- Does not transliterate Hindi text.
+- Does not perform unit conversion.
+- Does not use ML or LLM inference.
+
+#### Confidence behavior
+
+- **Same-line label/value**: extraction confidence = 0.9 (high).
+- **Next-line value**: extraction confidence = 0.6 (lower).
+- **OCR confidence** is preserved from the OCR engine.
+- **Extraction confidence** reflects the quality of the label/value association, not OCR quality.
+
+#### Limitations
+
+- Label matching is exact/normalized; it does not handle misspelled or heavily distorted labels.
+- Value extraction is limited to the same line or the immediately following line.
+- Does not group extracted fields into parcels automatically beyond basic list appending.
+- Does not handle multi-line owner names unless they appear on a single line.
+- Table structure detection is not implemented.
 
 ## Hindi-First Design
 
