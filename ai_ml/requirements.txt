@@ -2,3 +2,6 @@
 opencv-python-headless>=4.8.0
 pillow>=10.0.0
 numpy>=1.24.0
+
+# OCR runtime dependencies (CPU-only)
+paddleocr>=3.0.0

@@ -1,6 +1,7 @@
 """Architecture-level tests for ai_ml.ocr."""
 
 from typing import Optional
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -15,6 +16,7 @@ from ai_ml.ocr.exceptions import (
     OCRParsingError,
     OCRError,
 )
+from ai_ml.ocr.paddle_engine import PaddleOCREngine
 from ai_ml.ocr.schema import OCRBlock, OCRLine, OCRPage, OCRResult, OCRWord
 from ai_ml.ocr.postprocess import postprocess
 
@@ -42,6 +44,11 @@ class FakeOCREngine(OCREngine):
             language="hi",
             raw_metadata={"foo": "bar"},
         )
+
+
+# ---------------------------------------------------------------------------
+# Existing architecture tests
+# ---------------------------------------------------------------------------
 
 
 class TestOCRResultSchema:
@@ -188,3 +195,217 @@ class TestExceptions:
     def test_exception_hierarchy(self) -> None:
         with pytest.raises(OCRError):
             raise OCRImageError("subclass")
+
+
+# ---------------------------------------------------------------------------
+# PaddleOCR adapter tests (mocked — no real PaddleOCR required)
+# ---------------------------------------------------------------------------
+
+
+class _MockResult:
+    """Minimal mock for a PaddleOCR 3.x page result object."""
+
+    def __init__(self, json_data: dict):
+        self._json = json_data
+
+    @property
+    def json(self):
+        return self._json
+
+
+def _make_mock_page(
+    texts,
+    boxes,
+    scores,
+    width: int = 100,
+    height: int = 200,
+    page_index: int = 1,
+):
+    """Helper to build a mocked PaddleOCR page result."""
+    return _MockResult(
+        {
+            "rec_texts": texts,
+            "rec_boxes": boxes,
+            "rec_scores": scores,
+            "width": width,
+            "height": height,
+            "page_index": page_index,
+            "input_path": "test.png",
+        }
+    )
+
+
+class TestPaddleOCREngineInit:
+    def test_missing_dependency_raises(self) -> None:
+        with patch.dict("sys.modules", {"paddleocr": None}):
+            engine = PaddleOCREngine()
+            with pytest.raises(OCREngineUnavailableError):
+                engine._initialize()
+
+    def test_init_failure_raises(self) -> None:
+        mock_cls = MagicMock()
+        mock_cls.side_effect = RuntimeError("init failed")
+        with patch.dict("sys.modules", {"paddleocr": MagicMock(PaddleOCR=mock_cls)}):
+            engine = PaddleOCREngine()
+            with pytest.raises(OCREngineUnavailableError):
+                engine._initialize()
+
+    def test_cpu_default(self) -> None:
+        mock_cls = MagicMock()
+        with patch.dict("sys.modules", {"paddleocr": MagicMock(PaddleOCR=mock_cls)}):
+            engine = PaddleOCREngine(OCRConfig())
+            engine._initialize()
+            mock_cls.assert_called_once()
+            kwargs = mock_cls.call_args.kwargs
+            assert kwargs.get("use_gpu") is False
+
+
+class TestPaddleOCREngineRecognize:
+    def test_recognize_with_hindi_config(self) -> None:
+        mock_cls = MagicMock()
+        mock_cls.return_value.predict.return_value = [
+            _make_mock_page(
+                texts=["नमस्ते", "दुनिया"],
+                boxes=[[[0, 0], [10, 0], [10, 20], [0, 20]], [[20, 0], [40, 0], [40, 20], [20, 20]]],
+                scores=[0.95, 0.88],
+            )
+        ]
+        with patch.dict("sys.modules", {"paddleocr": MagicMock(PaddleOCR=mock_cls)}):
+            engine = PaddleOCREngine(OCRConfig(languages=["hi"]))
+            image = np.zeros((100, 100), dtype=np.uint8)
+            result = engine.recognize(image)
+            assert isinstance(result, OCRResult)
+            assert result.engine_name == "paddleocr"
+            assert result.language == "hi"
+            assert len(result.pages) == 1
+            assert len(result.pages[0].blocks) == 1
+            assert len(result.pages[0].blocks[0].lines) == 2
+
+    def test_recognize_returns_structured_words(self) -> None:
+        mock_cls = MagicMock()
+        mock_cls.return_value.predict.return_value = [
+            _make_mock_page(
+                texts=["कृष्ण"],
+                boxes=[[[5, 5], [15, 5], [15, 25], [5, 25]]],
+                scores=[0.92],
+            )
+        ]
+        with patch.dict("sys.modules", {"paddleocr": MagicMock(PaddleOCR=mock_cls)}):
+            engine = PaddleOCREngine(OCRConfig())
+            image = np.zeros((100, 100), dtype=np.uint8)
+            result = engine.recognize(image)
+            page = result.pages[0]
+            line = page.blocks[0].lines[0]
+            word = line.words[0]
+            assert word.text == "कृष्ण"
+            assert word.confidence == 0.92
+            assert word.bbox == (5, 5, 15, 25)
+
+    def test_recognize_empty_result(self) -> None:
+        mock_cls = MagicMock()
+        mock_cls.return_value.predict.return_value = []
+        with patch.dict("sys.modules", {"paddleocr": MagicMock(PaddleOCR=mock_cls)}):
+            engine = PaddleOCREngine()
+            image = np.zeros((100, 100), dtype=np.uint8)
+            result = engine.recognize(image)
+            assert isinstance(result, OCRResult)
+            assert len(result.pages) == 0
+
+    def test_recognize_invalid_image_raises(self) -> None:
+        engine = PaddleOCREngine()
+        with pytest.raises(OCRImageError):
+            engine.recognize(None)
+
+    def test_recognize_empty_image_raises(self) -> None:
+        engine = PaddleOCREngine()
+        with pytest.raises(OCRImageError):
+            engine.recognize(np.zeros((0, 0), dtype=np.uint8))
+
+    def test_recognize_inference_failure_raises(self) -> None:
+        mock_cls = MagicMock()
+        mock_cls.return_value.predict.side_effect = RuntimeError("inference failed")
+        with patch.dict("sys.modules", {"paddleocr": MagicMock(PaddleOCR=mock_cls)}):
+            engine = PaddleOCREngine()
+            image = np.zeros((100, 100), dtype=np.uint8)
+            with pytest.raises(OCRInferenceError):
+                engine.recognize(image)
+
+    def test_recognize_malformed_output_raises(self) -> None:
+        mock_cls = MagicMock()
+        mock_cls.return_value.predict.return_value = [_make_mock_page(texts=["x"], boxes=[], scores=[0.5])]
+        with patch.dict("sys.modules", {"paddleocr": MagicMock(PaddleOCR=mock_cls)}):
+            engine = PaddleOCREngine()
+            image = np.zeros((100, 100), dtype=np.uint8)
+            with pytest.raises(OCRParsingError):
+                engine.recognize(image)
+
+    def test_recognize_none_result_raises(self) -> None:
+        mock_cls = MagicMock()
+        mock_cls.return_value.predict.return_value = None
+        with patch.dict("sys.modules", {"paddleocr": MagicMock(PaddleOCR=mock_cls)}):
+            engine = PaddleOCREngine()
+            image = np.zeros((100, 100), dtype=np.uint8)
+            with pytest.raises(OCRInferenceError):
+                engine.recognize(image)
+
+
+class TestPaddleOCREngineOutputConversion:
+    def test_quadrilateral_bbox_normalized(self) -> None:
+        engine = PaddleOCREngine()
+        quad = [[10, 20], [50, 20], [50, 80], [10, 80]]
+        assert engine._normalize_bbox(quad) == (10, 20, 50, 80)
+
+    def test_rectangular_bbox_normalized(self) -> None:
+        engine = PaddleOCREngine()
+        rect = [5, 10, 15, 30]
+        assert engine._normalize_bbox(rect) == (5, 10, 15, 30)
+
+    def test_invalid_bbox_returns_none(self) -> None:
+        engine = PaddleOCREngine()
+        assert engine._normalize_bbox(None) is None
+        assert engine._normalize_bbox([1, 2]) is None
+        assert engine._normalize_bbox("invalid") is None
+
+    def test_confidence_clamping(self) -> None:
+        engine = PaddleOCREngine()
+        assert engine._normalize_confidence(0.5) == 0.5
+        assert engine._normalize_confidence(1.2) == 1.0
+        assert engine._normalize_confidence(-0.1) == 0.0
+        assert engine._normalize_confidence(None) is None
+
+    def test_multi_page_result(self) -> None:
+        mock_cls = MagicMock()
+        mock_cls.return_value.predict.return_value = [
+            _make_mock_page(texts=["page1"], boxes=[[[0, 0], [10, 0], [10, 20], [0, 20]]], scores=[0.9], page_index=1),
+            _make_mock_page(texts=["page2"], boxes=[[[0, 0], [20, 0], [20, 30], [0, 30]]], scores=[0.85], page_index=2),
+        ]
+        with patch.dict("sys.modules", {"paddleocr": MagicMock(PaddleOCR=mock_cls)}):
+            engine = PaddleOCREngine()
+            image = np.zeros((100, 100), dtype=np.uint8)
+            result = engine.recognize(image)
+            assert len(result.pages) == 2
+            assert result.pages[0].page_number == 1
+            assert result.pages[1].page_number == 2
+            assert result.pages[0].blocks[0].lines[0].words[0].text == "page1"
+            assert result.pages[1].blocks[0].lines[0].words[0].text == "page2"
+
+    def test_retain_raw_output(self) -> None:
+        mock_cls = MagicMock()
+        mock_cls.return_value.predict.return_value = [
+            _make_mock_page(texts=["x"], boxes=[[[0, 0], [10, 0], [10, 20], [0, 20]]], scores=[0.9])
+        ]
+        with patch.dict("sys.modules", {"paddleocr": MagicMock(PaddleOCR=mock_cls)}):
+            config = OCRConfig(retain_raw_output=True)
+            engine = PaddleOCREngine(config)
+            image = np.zeros((100, 100), dtype=np.uint8)
+            result = engine.recognize(image)
+            assert result.raw_metadata is not None
+            assert result.raw_metadata["engine"] == "paddleocr"
+
+    def test_hindi_language_resolution(self) -> None:
+        engine = PaddleOCREngine()
+        assert engine._resolve_language(["hi"]) == "hi"
+        assert engine._resolve_language(["en"]) == "en"
+        assert engine._resolve_language(["hi", "en"]) == "hi"
+        assert engine._resolve_language([]) == "hi"
+        assert engine._resolve_language(["latin"]) == "latin"
