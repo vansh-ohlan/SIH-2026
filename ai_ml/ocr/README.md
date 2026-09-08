@@ -23,7 +23,7 @@ structured OCRResult ready for extraction
 The `OCRResult` schema preserves spatial and linguistic information needed for
 Jamabandi documents:
 
-- `OCRWord`: text, confidence, bbox, language
+- `OCRWord`: text, original_text, confidence, bbox, language
 - `OCRLine`: line_id, words, bbox
 - `OCRBlock`: block_id, lines, bbox
 - `OCRPage`: page_number, blocks, width, height
@@ -31,6 +31,11 @@ Jamabandi documents:
 
 Confidence values are floats in `[0.0, 1.0]` or `None` if the engine does not
 provide them.
+
+`OCRWord.original_text` preserves the unmodified OCR output for auditability.
+When post-processing changes a word, `text` contains the cleaned version and
+`original_text` contains the raw OCR text. When no change is made,
+`original_text` remains `None`.
 
 ## Engine Abstraction
 
@@ -168,20 +173,80 @@ OCR output preserves spatial information for table-heavy documents:
 - Normalization to `[0.0, 1.0]` is the responsibility of each engine adapter.
 - Field-level confidence will be computed later by the validation module.
 
-## Post-Processing Boundary
+## Post-Processing
 
 OCR recognition and post-processing are kept separate:
 
 ```python
 from ai_ml.ocr import OCREngine, OCRConfig, postprocess
+from ai_ml.ocr.postprocess import PostprocessConfig
 
 engine = PaddleOCREngine()
 raw_result = engine.recognize(image, config)
-clean_result = postprocess(raw_result, config)
+
+pp_config = PostprocessConfig(
+    apply_unicode_normalization=True,
+    apply_whitespace_normalization=True,
+    retain_original_text=True,
+)
+
+clean_result = postprocess(raw_result, config=pp_config)
 ```
 
-Post-processing currently returns the result unchanged. Future implementations
-may add word merging, numeral normalization, and reading-order correction.
+### Post-Processing Behavior
+
+The post-processor is intentionally **conservative** because land records are
+legally sensitive. It cleans formatting and obvious OCR artifacts but does not
+autocorrect words or guess missing content.
+
+| Operation | Default | Description |
+|---|---|---|
+| Unicode normalization | Enabled | NFC normalization for Devanagari and mixed text |
+| Whitespace normalization | Enabled | Collapses repeated spaces, trims, replaces line breaks |
+| Remove empty elements | Enabled | Removes empty or whitespace-only words/lines/blocks |
+| Preserve numeric as-is | Enabled | Digits, slashes, hyphens, decimals are never altered |
+| Preserve Devanagari as-is | Enabled | Hindi/Devanagari text is preserved without transliteration |
+| Retain original text | Enabled | Stores raw OCR text in `OCRWord.original_text` |
+
+### Numeric Preservation
+
+Numeric and semi-numeric patterns are preserved exactly:
+
+- Digits: `123`
+- Decimals: `2.5`
+- Slash-separated: `142/1`, `247/2/3`
+- Hyphenated: `2-5-10` (area notation)
+
+### Hindi / English / Mixed Text
+
+- Devanagari text is preserved without transliteration.
+- Mixed Hindi + English + numeric strings are kept intact.
+- No forced language normalization is applied.
+
+### Bounding Box / Metadata Preservation
+
+Post-processing never drops or recalculates bounding boxes, page numbers,
+line IDs, or block IDs. If a word is removed because it is empty, its
+spatial metadata is removed with it.
+
+### Confidence
+
+Confidence values are preserved exactly as returned by the OCR engine.
+No artificial inflation or deflation is applied.
+
+### Auditability
+
+When `retain_original_text=True` (default), every changed word stores its
+raw OCR text in `original_text`. This allows downstream validation and
+human review to compare the original OCR output against the cleaned text.
+
+### Limitations
+
+- No word merging across line breaks.
+- No reading-order reordering.
+- No table reconstruction.
+- No Devanagari-specific spell correction.
+- No date/number normalization (e.g., Devanagari numerals are not converted).
 
 ## Error Handling
 
@@ -200,5 +265,7 @@ Errors are never silently swallowed.
 - Tesseract adapter
 - Layout/table extraction
 - Field-level confidence scoring
-- Devanagari-specific post-processing rules
-- Language auto-detection
+- Word merging across line breaks
+- Reading-order reordering
+- Devanagari-specific spell correction
+- Date/number normalization

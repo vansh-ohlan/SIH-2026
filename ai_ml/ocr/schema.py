@@ -9,6 +9,7 @@ class OCRWord:
     """Represents a single recognized word."""
 
     text: str
+    original_text: Optional[str] = None
     confidence: Optional[float] = None
     bbox: Optional[tuple[int, int, int, int]] = None
     language: Optional[str] = None
