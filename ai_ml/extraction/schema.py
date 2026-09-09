@@ -275,3 +275,11 @@ class ExtractionResult(BaseModel):
         default_factory=list,
         description="Conflicting values from different extractors for the same field.",
     )
+    validation_error_count: int = Field(
+        default=0,
+        description="Number of validation issues with severity='error'.",
+    )
+    validation_warning_count: int = Field(
+        default=0,
+        description="Number of validation issues with severity='warning'.",
+    )

@@ -55,6 +55,12 @@ class ExtractionPipeline(ExtractionStrategy):
         merged_result.warnings.extend(
             [f"[validation] {issue.message}" for issue in validation.issues]
         )
+        merged_result.validation_error_count = sum(
+            1 for issue in validation.issues if issue.severity == "error"
+        )
+        merged_result.validation_warning_count = sum(
+            1 for issue in validation.issues if issue.severity == "warning"
+        )
 
         return merged_result
 
