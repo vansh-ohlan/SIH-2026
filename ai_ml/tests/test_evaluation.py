@@ -15,14 +15,26 @@ from ai_ml.evaluation.report import generate_report, to_json
 from ai_ml.evaluation.synthetic import (
     generate_clean_ror,
     generate_clean_ror_prediction,
+    generate_conflicting_values_ground_truth,
+    generate_conflicting_values_prediction,
+    generate_devanagari_numbers_ground_truth,
+    generate_devanagari_numbers_prediction,
+    generate_hindi_labels_ground_truth,
+    generate_hindi_labels_prediction,
     generate_missing_field_ground_truth,
     generate_missing_field_prediction,
+    generate_missing_table_cells_ground_truth,
+    generate_missing_table_cells_prediction,
     generate_mixed_script_prediction,
     generate_mixed_script_ror,
     generate_multi_parcel_ground_truth,
     generate_multi_parcel_prediction,
     generate_noisy_ocr_ground_truth,
     generate_noisy_ocr_prediction,
+    generate_ocr_whitespace_ground_truth,
+    generate_ocr_whitespace_prediction,
+    generate_table_rows_ground_truth,
+    generate_table_rows_prediction,
     get_all_datasets,
     get_all_predictions,
 )
@@ -289,3 +301,106 @@ class TestSyntheticData:
         assert isinstance(json_str, str)
         parsed = json.loads(json_str)
         assert "overall_accuracy" in parsed
+
+
+class TestRoRBenchmarkFixtures:
+    def test_hindi_labels_fixtures_available(self) -> None:
+        from ai_ml.evaluation.synthetic import (
+            generate_hindi_labels_ground_truth,
+            generate_hindi_labels_prediction,
+        )
+        gt = generate_hindi_labels_ground_truth()
+        pred = generate_hindi_labels_prediction()
+        assert "khata_number" in gt
+        assert pred != gt
+
+    def test_devanagari_numbers_fixtures_available(self) -> None:
+        from ai_ml.evaluation.synthetic import (
+            generate_devanagari_numbers_ground_truth,
+            generate_devanagari_numbers_prediction,
+        )
+        gt = generate_devanagari_numbers_ground_truth()
+        pred = generate_devanagari_numbers_prediction()
+        assert "२०२३" in gt["year"]
+        assert pred != gt
+
+    def test_ocr_whitespace_fixtures_available(self) -> None:
+        from ai_ml.evaluation.synthetic import (
+            generate_ocr_whitespace_ground_truth,
+            generate_ocr_whitespace_prediction,
+        )
+        gt = generate_ocr_whitespace_ground_truth()
+        pred = generate_ocr_whitespace_prediction()
+        assert pred != gt
+
+    def test_table_rows_fixtures_available(self) -> None:
+        from ai_ml.evaluation.synthetic import (
+            generate_table_rows_ground_truth,
+            generate_table_rows_prediction,
+        )
+        gt = generate_table_rows_ground_truth()
+        pred = generate_table_rows_prediction()
+        assert len(gt["parcels"]) == 3
+        assert pred != gt
+
+    def test_missing_table_cells_fixtures_available(self) -> None:
+        from ai_ml.evaluation.synthetic import (
+            generate_missing_table_cells_ground_truth,
+            generate_missing_table_cells_prediction,
+        )
+        gt = generate_missing_table_cells_ground_truth()
+        pred = generate_missing_table_cells_prediction()
+        assert "khata_number" not in pred
+        assert pred != gt
+
+    def test_conflicting_values_fixtures_available(self) -> None:
+        from ai_ml.evaluation.synthetic import (
+            generate_conflicting_values_ground_truth,
+            generate_conflicting_values_prediction,
+        )
+        gt = generate_conflicting_values_ground_truth()
+        pred = generate_conflicting_values_prediction()
+        assert len(gt["parcels"]) == 2
+        assert pred != gt
+
+    def test_parcel_metrics_in_report(self) -> None:
+        evaluator = ExtractionEvaluator()
+        gt = generate_table_rows_ground_truth()
+        pred = generate_table_rows_prediction()
+        result = evaluator.evaluate(pred, gt)
+        assert "parcel_metrics" in result
+        assert "precision" in result["parcel_metrics"]
+
+    def test_landholder_metrics_in_report(self) -> None:
+        evaluator = ExtractionEvaluator()
+        gt = generate_table_rows_ground_truth()
+        pred = generate_table_rows_prediction()
+        result = evaluator.evaluate(pred, gt)
+        assert "landholder_metrics" in result
+        assert "precision" in result["landholder_metrics"]
+
+    def test_table_row_metrics_in_report(self) -> None:
+        evaluator = ExtractionEvaluator()
+        gt = generate_table_rows_ground_truth()
+        pred = generate_table_rows_prediction()
+        result = evaluator.evaluate(pred, gt)
+        assert "table_row_metrics" in result
+        assert "association_accuracy" in result["table_row_metrics"]
+
+    def test_missing_cells_reduce_coverage(self) -> None:
+        evaluator = ExtractionEvaluator()
+        gt = generate_missing_table_cells_ground_truth()
+        pred = generate_missing_table_cells_prediction()
+        result = evaluator.evaluate(pred, gt)
+        assert result["coverage"]["coverage"] < 1.0
+
+    def test_benchmark_cli_output_clear_labeling(self) -> None:
+        import subprocess
+        import json
+        output = subprocess.check_output(
+            ["python", "-m", "ai_ml.evaluation", "clean_ror"],
+            text=True,
+        )
+        data = json.loads(output)
+        assert "evaluation_type" in data
+        assert "synthetic_evaluation_fixtures" in data["evaluation_type"]

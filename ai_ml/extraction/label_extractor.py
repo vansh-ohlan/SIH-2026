@@ -6,6 +6,7 @@ import re
 from typing import Any, Optional
 
 from ai_ml.extraction.exceptions import ExtractionFailureError, InvalidOCRResultError
+from ai_ml.extraction.normalization import find_label_in_text
 from ai_ml.extraction.schema import (
     ExtractionMethod,
     ExtractionResult,
@@ -121,22 +122,7 @@ def _extract_value_from_line(line, label_end_index: int) -> str:
 
 
 def _find_label_in_line(line_text: str) -> Optional[tuple[str, int]]:
-    normalized = _normalize_text(line_text)
-    for field_name, labels in _LABEL_MAP.items():
-        for label in labels.values():
-            norm_label = _normalize_text(label)
-            if normalized.startswith(norm_label):
-                return field_name, len(norm_label.split())
-            if norm_label in normalized:
-                return field_name, len(norm_label.split())
-    for field_name, variants in _EXTRA_LABEL_VARIANTS.items():
-        for variant in variants:
-            norm_variant = _normalize_text(variant)
-            if normalized.startswith(norm_variant):
-                return field_name, len(norm_variant.split())
-            if norm_variant in normalized:
-                return field_name, len(norm_variant.split())
-    return None
+    return find_label_in_text(line_text)
 
 
 def _extract_value(

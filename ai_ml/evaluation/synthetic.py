@@ -253,6 +253,12 @@ def get_all_datasets() -> dict[str, dict[str, Any]]:
         "noisy_ocr": generate_noisy_ocr_ground_truth(),
         "missing_field": generate_missing_field_ground_truth(),
         "multi_parcel": generate_multi_parcel_ground_truth(),
+        "hindi_labels": generate_hindi_labels_ground_truth(),
+        "devanagari_numbers": generate_devanagari_numbers_ground_truth(),
+        "ocr_whitespace_corruption": generate_ocr_whitespace_ground_truth(),
+        "table_rows": generate_table_rows_ground_truth(),
+        "missing_table_cells": generate_missing_table_cells_ground_truth(),
+        "conflicting_values": generate_conflicting_values_ground_truth(),
     }
 
 
@@ -268,4 +274,202 @@ def get_all_predictions() -> dict[str, dict[str, Any]]:
         "noisy_ocr": generate_noisy_ocr_prediction(),
         "missing_field": generate_missing_field_prediction(),
         "multi_parcel": generate_multi_parcel_prediction(),
+        "hindi_labels": generate_hindi_labels_prediction(),
+        "devanagari_numbers": generate_devanagari_numbers_prediction(),
+        "ocr_whitespace_corruption": generate_ocr_whitespace_prediction(),
+        "table_rows": generate_table_rows_prediction(),
+        "missing_table_cells": generate_missing_table_cells_prediction(),
+        "conflicting_values": generate_conflicting_values_prediction(),
     }
+
+
+# ---------------------------------------------------------------------------
+# RoR-specific benchmark datasets
+# ---------------------------------------------------------------------------
+
+
+def generate_hindi_labels_ground_truth(seed: int = _DEFAULT_SEED + 10) -> dict[str, Any]:
+    """Generate a record testing Hindi label robustness."""
+    rng = _rng(seed)
+    return {
+        "document_id": f"DOC-{rng.randint(1000, 9999)}",
+        "state": "Rajasthan",
+        "district": "जयपुर",
+        "tehsil": "जयपुर",
+        "village": "रामगढ़",
+        "year": "2023-24",
+        "khata_number": "111",
+        "khasra_number": "250/1",
+        "landholders": [
+            {"name": "राम", "father_or_husband_name": "लक्ष्मण"}
+        ],
+        "parcels": [
+            {"khasra_number": "250/1", "area_raw": "3-0-0", "revenue": "600"}
+        ],
+    }
+
+
+def generate_devanagari_numbers_ground_truth(seed: int = _DEFAULT_SEED + 11) -> dict[str, Any]:
+    """Generate a record testing Devanagari numeral handling."""
+    rng = _rng(seed)
+    return {
+        "document_id": f"DOC-{rng.randint(1000, 9999)}",
+        "state": "Rajasthan",
+        "district": "जयपुर",
+        "tehsil": "जयपुर",
+        "village": "रामगढ़",
+        "year": "२०२३-२४",
+        "khata_number": "१२३",
+        "khasra_number": "३५०/१",
+        "landholders": [
+            {"name": "राम"}
+        ],
+        "parcels": [
+            {"khasra_number": "३५०/१", "area_raw": "४-५-१०", "revenue": "५००"}
+        ],
+    }
+
+
+def generate_ocr_whitespace_ground_truth(seed: int = _DEFAULT_SEED + 12) -> dict[str, Any]:
+    """Generate a record testing OCR whitespace/punctuation corruption."""
+    rng = _rng(seed)
+    return {
+        "document_id": f"DOC-{rng.randint(1000, 9999)}",
+        "state": "Rajasthan ",
+        "district": " जयपुर",
+        "tehsil": "जयपुर",
+        "village": "रामगढ़ !!!",
+        "year": "2023 - 24",
+        "khata_number": "123",
+        "khasra_number": "400/1",
+        "landholders": [
+            {"name": "राम"}
+        ],
+        "parcels": [
+            {"khasra_number": "400/1", "area_raw": "2-0-0", "revenue": "300"}
+        ],
+    }
+
+
+def generate_table_rows_ground_truth(seed: int = _DEFAULT_SEED + 13) -> dict[str, Any]:
+    """Generate a record with multiple table-row parcels."""
+    rng = _rng(seed)
+    return {
+        "document_id": f"DOC-{rng.randint(1000, 9999)}",
+        "state": "Rajasthan",
+        "district": "जयपुर",
+        "tehsil": "जयपुर",
+        "village": "रामगढ़",
+        "year": "2023-24",
+        "khata_number": "555",
+        "landholders": [
+            {"name": "राम"},
+            {"name": "कृष्ण"},
+        ],
+        "parcels": [
+            {"khasra_number": "200/1", "area_raw": "2.5", "land_classification": "कृषि", "irrigation_source": "सिंचित", "revenue": "50"},
+            {"khasra_number": "200/2", "area_raw": "1.2", "land_classification": "कृषि", "irrigation_source": "असिंचित", "revenue": "25"},
+            {"khasra_number": "201/1", "area_raw": "3.0", "land_classification": "बंजर", "irrigation_source": "बारिश", "revenue": "75"},
+        ],
+    }
+
+
+def generate_missing_table_cells_ground_truth(seed: int = _DEFAULT_SEED + 14) -> dict[str, Any]:
+    """Generate a record with missing table cells."""
+    rng = _rng(seed)
+    return {
+        "document_id": f"DOC-{rng.randint(1000, 9999)}",
+        "state": "Rajasthan",
+        "district": "जयपुर",
+        "tehsil": "जयपुर",
+        "village": "रामगढ़",
+        "year": "2023-24",
+        "khata_number": "666",
+        "landholders": [
+            {"name": "राम"}
+        ],
+        "parcels": [
+            {"khasra_number": "300/1", "area_raw": "2.0", "land_classification": "कृषि"},
+            {"khasra_number": "300/2", "revenue": "40"},
+        ],
+    }
+
+
+def generate_conflicting_values_ground_truth(seed: int = _DEFAULT_SEED + 15) -> dict[str, Any]:
+    """Generate a record with potentially conflicting values across rows."""
+    rng = _rng(seed)
+    return {
+        "document_id": f"DOC-{rng.randint(1000, 9999)}",
+        "state": "Rajasthan",
+        "district": "जयपुर",
+        "tehsil": "जयपुर",
+        "village": "रामगढ़",
+        "year": "2023-24",
+        "khata_number": "777",
+        "landholders": [
+            {"name": "राम"}
+        ],
+        "parcels": [
+            {"khasra_number": "500/1", "area_raw": "2-5-10", "revenue": "500"},
+            {"khasra_number": "500/2", "area_raw": "1-0-0", "revenue": "250"},
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Deterministic prediction fixtures with controlled errors
+# ---------------------------------------------------------------------------
+
+
+def generate_hindi_labels_prediction(seed: int = _DEFAULT_SEED + 10) -> dict[str, Any]:
+    rng = _rng(seed)
+    pred = _copy_ground_truth(generate_hindi_labels_ground_truth(seed))
+    pred["district"] = "जयपुर "
+    pred["parcels"][0]["revenue"] = "60O"
+    return pred
+
+
+def generate_devanagari_numbers_prediction(seed: int = _DEFAULT_SEED + 11) -> dict[str, Any]:
+    rng = _rng(seed)
+    pred = _copy_ground_truth(generate_devanagari_numbers_ground_truth(seed))
+    pred["khata_number"] = "१२४"
+    pred["parcels"][0]["revenue"] = "५५०"
+    return pred
+
+
+def generate_ocr_whitespace_prediction(seed: int = _DEFAULT_SEED + 12) -> dict[str, Any]:
+    rng = _rng(seed)
+    pred = _copy_ground_truth(generate_ocr_whitespace_ground_truth(seed))
+    pred["state"] = "Rajasthan"
+    pred["village"] = "रामगढ"
+    pred["year"] = "2023-24"
+    return pred
+
+
+def generate_table_rows_prediction(seed: int = _DEFAULT_SEED + 13) -> dict[str, Any]:
+    rng = _rng(seed)
+    pred = _copy_ground_truth(generate_table_rows_ground_truth(seed))
+    if pred.get("parcels"):
+        pred["parcels"][0] = dict(pred["parcels"][0])
+        pred["parcels"][0]["khasra_number"] = "200/9"
+        pred["parcels"][0]["revenue"] = "55"
+    return pred
+
+
+def generate_missing_table_cells_prediction(seed: int = _DEFAULT_SEED + 14) -> dict[str, Any]:
+    rng = _rng(seed)
+    pred = _copy_ground_truth(generate_missing_table_cells_ground_truth(seed))
+    pred.pop("khata_number", None)
+    if pred.get("parcels"):
+        pred["parcels"][0] = dict(pred["parcels"][0])
+        pred["parcels"][0].pop("area_raw", None)
+    return pred
+
+
+def generate_conflicting_values_prediction(seed: int = _DEFAULT_SEED + 15) -> dict[str, Any]:
+    rng = _rng(seed)
+    pred = _copy_ground_truth(generate_conflicting_values_ground_truth(seed))
+    if pred.get("parcels"):
+        pred["parcels"][0] = dict(pred["parcels"][0])
+        pred["parcels"][0]["revenue"] = "600"
+    return pred

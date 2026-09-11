@@ -122,3 +122,196 @@ def compute_coverage(
         "total_predicted_fields": total_pred,
         "coverage": coverage,
     }
+
+
+def parcel_level_accuracy(
+    predicted_parcels: list[dict[str, Any]],
+    ground_truth_parcels: list[dict[str, Any]],
+    key_field: str = "khasra_number",
+) -> dict[str, Any]:
+    """Compute parcel-level accuracy by matching on a key field (default: khasra_number).
+
+    Parcels are matched by their key field value. Unmatched predicted parcels
+    count as false positives; unmatched ground-truth parcels count as false negatives.
+
+    Args:
+        predicted_parcels: List of predicted parcel dicts.
+        ground_truth_parcels: List of ground-truth parcel dicts.
+        key_field: Field name to use for matching parcels.
+
+    Returns:
+        Dict with parcel-level accuracy metrics.
+    """
+    pred_by_key: dict[str, dict[str, Any]] = {}
+    for parcel in predicted_parcels:
+        key = _normalize(parcel.get(key_field))
+        if key:
+            pred_by_key[key] = parcel
+
+    gt_by_key: dict[str, dict[str, Any]] = {}
+    for parcel in ground_truth_parcels:
+        key = _normalize(parcel.get(key_field))
+        if key:
+            gt_by_key[key] = parcel
+
+    matched_keys = set(pred_by_key.keys()) & set(gt_by_key.keys())
+
+    true_positives = 0
+    false_positives = 0
+    false_negatives = 0
+
+    for key in matched_keys:
+        pred_parcel = pred_by_key[key]
+        gt_parcel = gt_by_key[key]
+        if _parcels_match(pred_parcel, gt_parcel):
+            true_positives += 1
+        else:
+            false_positives += 1
+            false_negatives += 1
+
+    false_positives += len(set(pred_by_key.keys()) - matched_keys)
+    false_negatives += len(set(gt_by_key.keys()) - matched_keys)
+
+    precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 1.0
+    recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 1.0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+
+    return {
+        "true_positives": true_positives,
+        "false_positives": false_positives,
+        "false_negatives": false_negatives,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "matched_keys": sorted(matched_keys),
+    }
+
+
+def _parcels_match(pred: dict[str, Any], gt: dict[str, Any]) -> bool:
+    """Return True if predicted parcel matches ground truth for evaluated fields."""
+    evaluated_fields = ["khasra_number", "area_raw", "land_classification", "irrigation_source", "revenue"]
+    for field in evaluated_fields:
+        if not exact_match(pred.get(field), gt.get(field)):
+            return False
+    return True
+
+
+def landholder_level_accuracy(
+    predicted_landholders: list[dict[str, Any]],
+    ground_truth_landholders: list[dict[str, Any]],
+    key_field: str = "name",
+) -> dict[str, Any]:
+    """Compute landholder-level accuracy by matching on a key field (default: name).
+
+    Args:
+        predicted_landholders: List of predicted landholder dicts.
+        ground_truth_landholders: List of ground-truth landholder dicts.
+        key_field: Field name to use for matching landholders.
+
+    Returns:
+        Dict with landholder-level accuracy metrics.
+    """
+    pred_by_key: dict[str, dict[str, Any]] = {}
+    for holder in predicted_landholders:
+        key = _normalize(holder.get(key_field))
+        if key:
+            pred_by_key[key] = holder
+
+    gt_by_key: dict[str, dict[str, Any]] = {}
+    for holder in ground_truth_landholders:
+        key = _normalize(holder.get(key_field))
+        if key:
+            gt_by_key[key] = holder
+
+    matched_keys = set(pred_by_key.keys()) & set(gt_by_key.keys())
+
+    true_positives = 0
+    false_positives = 0
+    false_negatives = 0
+
+    for key in matched_keys:
+        pred_holder = pred_by_key[key]
+        gt_holder = gt_by_key[key]
+        if _landholders_match(pred_holder, gt_holder):
+            true_positives += 1
+        else:
+            false_positives += 1
+            false_negatives += 1
+
+    false_positives += len(set(pred_by_key.keys()) - matched_keys)
+    false_negatives += len(set(gt_by_key.keys()) - matched_keys)
+
+    precision = true_positives / (true_positives + false_positives) if (true_positives + false_positives) > 0 else 1.0
+    recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 1.0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+
+    return {
+        "true_positives": true_positives,
+        "false_positives": false_positives,
+        "false_negatives": false_negatives,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "matched_keys": sorted(matched_keys),
+    }
+
+
+def _landholders_match(pred: dict[str, Any], gt: dict[str, Any]) -> bool:
+    """Return True if predicted landholder matches ground truth for evaluated fields."""
+    evaluated_fields = ["name", "father_or_husband_name", "share"]
+    for field in evaluated_fields:
+        if not exact_match(pred.get(field), gt.get(field)):
+            return False
+    return True
+
+
+def table_row_association_accuracy(
+    predicted_parcels: list[dict[str, Any]],
+    ground_truth_parcels: list[dict[str, Any]],
+    key_field: str = "khasra_number",
+) -> dict[str, Any]:
+    """Compute table-row association accuracy.
+
+    Measures whether values from the same row in the ground truth are kept
+    together in the prediction. A row association is correct if all fields
+    for a given key_field value are present in the same predicted parcel.
+
+    Args:
+        predicted_parcels: List of predicted parcel dicts.
+        ground_truth_parcels: List of ground-truth parcel dicts.
+        key_field: Field name used to identify rows/parcels.
+
+    Returns:
+        Dict with row-association accuracy metrics.
+    """
+    gt_by_key: dict[str, dict[str, Any]] = {}
+    for parcel in ground_truth_parcels:
+        key = _normalize(parcel.get(key_field))
+        if key:
+            gt_by_key[key] = parcel
+
+    pred_by_key: dict[str, dict[str, Any]] = {}
+    for parcel in predicted_parcels:
+        key = _normalize(parcel.get(key_field))
+        if key:
+            pred_by_key[key] = parcel
+
+    matched_keys = set(gt_by_key.keys()) & set(pred_by_key.keys())
+
+    correct_associations = 0
+    total_gt_rows = len(gt_by_key)
+
+    for key in matched_keys:
+        pred_parcel = pred_by_key[key]
+        gt_parcel = gt_by_key[key]
+        if _parcels_match(pred_parcel, gt_parcel):
+            correct_associations += 1
+
+    association_accuracy = correct_associations / total_gt_rows if total_gt_rows > 0 else 1.0
+
+    return {
+        "correct_associations": correct_associations,
+        "total_ground_truth_rows": total_gt_rows,
+        "association_accuracy": association_accuracy,
+        "matched_keys": sorted(matched_keys),
+    }
