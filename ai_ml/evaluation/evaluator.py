@@ -8,7 +8,10 @@ from ai_ml.evaluation.metrics import (
     compute_coverage,
     exact_match,
     field_accuracy,
+    landholder_level_accuracy,
     normalize_match,
+    parcel_level_accuracy,
+    table_row_association_accuracy,
 )
 
 
@@ -135,7 +138,50 @@ class ExtractionEvaluator:
             "exact_match_count": exact_matches,
             "normalized_match_count": normalized_matches,
             "total_evaluated": total,
+            "parcel_metrics": self._compute_parcel_metrics(predicted, ground_truth),
+            "landholder_metrics": self._compute_landholder_metrics(predicted, ground_truth),
+            "table_row_metrics": self._compute_table_row_metrics(predicted, ground_truth),
         }
+
+    def _compute_parcel_metrics(self, predicted: Any, ground_truth: dict[str, Any]) -> dict[str, Any]:
+        pred_parcels = _extract_list(predicted, "parcels")
+        gt_parcels = ground_truth.get("parcels", [])
+        if not pred_parcels and not gt_parcels:
+            return {"note": "no parcels"}
+        return parcel_level_accuracy(pred_parcels, gt_parcels)
+
+    def _compute_landholder_metrics(self, predicted: Any, ground_truth: dict[str, Any]) -> dict[str, Any]:
+        pred_holders = _extract_list(predicted, "landholders")
+        gt_holders = ground_truth.get("landholders", [])
+        if not pred_holders and not gt_holders:
+            return {"note": "no landholders"}
+        return landholder_level_accuracy(pred_holders, gt_holders)
+
+    def _compute_table_row_metrics(self, predicted: Any, ground_truth: dict[str, Any]) -> dict[str, Any]:
+        pred_parcels = _extract_list(predicted, "parcels")
+        gt_parcels = ground_truth.get("parcels", [])
+        if not pred_parcels and not gt_parcels:
+            return {"note": "no parcels"}
+        return table_row_association_accuracy(pred_parcels, gt_parcels)
+
+
+def _extract_list(predicted: Any, key: str) -> list[dict[str, Any]]:
+    """Extract a list from predicted input (ExtractionResult or dict)."""
+    record = _extract_record(predicted)
+    if record is None:
+        return []
+    if hasattr(record, key):
+        raw = getattr(record, key)
+        result = []
+        for item in raw:
+            if hasattr(item, "__dict__"):
+                result.append({k: v for k, v in item.__dict__.items() if not k.startswith("_")})
+            elif isinstance(item, dict):
+                result.append(item)
+        return result
+    if isinstance(record, dict):
+        return record.get(key, [])
+    return []
 
 
 def _flatten_ground_truth(source: Any, output: dict[str, Any], prefix: str) -> None:
