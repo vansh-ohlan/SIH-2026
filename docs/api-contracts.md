@@ -136,9 +136,110 @@ Response 200 -- standard GeoJSON FeatureCollection, one Feature per parcel:
 - Auth header (mock for demo): Authorization: Bearer <token> -- Backend returns a dummy token on login, no real verification needed for Phase 1-3.
 - CORS open to localhost:3000 for local dev.
 
+## 7. POST /api/v1/inference/document
+
+Upload a scanned RoR image and run the full AI/ML inference pipeline. This is the primary interface between the backend and the AI service.
+
+Request: multipart/form-data
+- file: image file (png, jpg, jpeg, bmp, tiff, tif)
+
+Example request:
+POST /api/v1/inference/document
+Content-Type: multipart/form-data; boundary=----FormBoundary
+
+------FormBoundary
+Content-Disposition: form-data; name="file"; filename="ror_sample.png"
+Content-Type: image/png
+
+<binary image data>
+------FormBoundary--
+
+Response 200:
+{
+  "extraction_result": {
+    "status": "success",
+    "metadata": {
+      "document_id": { "value": "DOC-123", "provenance": { "source_ocr_text": "...", "extraction_confidence": 0.92 } },
+      "state": { "value": "Punjab" },
+      "district": { "value": "Ludhiana" },
+      "tehsil": { "value": "Ludhiana East" },
+      "village": { "value": "Burj Littan" },
+      "year": { "value": 2024 },
+      "document_type": { "value": "Jamabandi" },
+      "khata_number": { "value": "12" },
+      "khewat_number": { "value": "5" }
+    },
+    "landholders": [
+      {
+        "name": { "value": "Ramesh Kumar", "provenance": { "extraction_confidence": 0.95 } },
+        "father_or_husband_name": { "value": "Suresh Kumar" },
+        "share": { "value": "0.5" }
+      }
+    ],
+    "parcels": [
+      {
+        "khasra_number": { "value": "142/3" },
+        "area_raw": { "value": "1250 sqm" },
+        "area_normalized": { "value": 1250.0 },
+        "area_unit": { "value": "sqm" },
+        "land_type": { "value": "Residential" }
+      }
+    ],
+    "unrecognized_text": ["..."],
+    "warnings": ["Low OCR confidence on page 2"],
+    "validation_error_count": 0,
+    "validation_warning_count": 1
+  },
+  "confidence_score": 0.87,
+  "extraction_risk": "low",
+  "anomaly_score": -0.12,
+  "anomaly_risk": "low",
+  "anomaly_features": [0.1, -0.2, 0.05],
+  "explainability_evidence": {
+    "top_influences": [
+      { "field": "area_normalized", "importance": 0.4 },
+      { "field": "land_type", "importance": 0.25 }
+    ]
+  }
+}
+
+Response 400: Invalid request (missing file, unsupported file type)
+{
+  "error": "missing_file",
+  "message": "A file must be provided in the 'file' field."
+}
+
+Response 422: Unreadable or invalid image/OCR failure
+{
+  "error": "unreadable_document",
+  "message": "OCR could not extract required fields"
+}
+
+Response 500: Internal inference failure
+{
+  "error": "inference_failure",
+  "message": "Document inference failed."
+}
+
+Field notes:
+- confidence_score: overall pipeline confidence in [0.0, 1.0].
+- extraction_risk: low | medium | high based on validation and extraction confidence.
+- anomaly_score: Isolation Forest anomaly score. Negative or low values typically mean normal; high positive values indicate anomaly.
+- anomaly_risk: low | medium | high derived from anomaly score distribution.
+- explainability_evidence: optional field importance evidence from the explainability module.
+- Provenance fields: source_ocr_text, source_bbox, page_number, ocr_confidence, extraction_confidence, extraction_method, extractor_version.
+
+## Shared conventions (all endpoints)
+
+- All timestamps ISO 8601 UTC.
+- All errors: { "error": "snake_case_code", "message": "human readable" }
+- Auth header (mock for demo): Authorization: Bearer <token> -- Backend returns a dummy token on login, no real verification needed for Phase 1-3.
+- CORS open to localhost:3000 for local dev.
+
 ## Handoff checklist (Team Lead: confirm each by Hour 2:00)
 
 - [ ] Backend has created these routes as stubs (can return hardcoded JSON matching the shapes above)
 - [ ] Frontend has this doc and is building against these shapes, not waiting on live backend
 - [ ] ML has confirmed /ocr/extract request/response shape works with their pipeline output
 - [ ] GIS has confirmed /map/parcels GeoJSON shape matches what GeoServer/PostGIS will produce
+- [ ] Backend has reviewed POST /api/v1/inference/document contract and confirmed it is consumable
