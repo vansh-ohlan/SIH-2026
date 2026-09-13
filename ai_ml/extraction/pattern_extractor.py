@@ -63,7 +63,7 @@ _PATTERN_DEFS: list[tuple[str, re.Pattern[str], re.Pattern[str], float]] = [
     (
         "mutation_number",
         re.compile(r"(?:mutation\s+number|नामांतरण\s+संख्या|म्यूटेशन)", re.IGNORECASE),
-        re.compile(r"([\w-]+(?:/[\w-]+)*)"),
+        re.compile(r"([\w\u0900-\u097F-]+(?:/[\w\u0900-\u097F-]+)*)"),
         0.75,
     ),
     (
@@ -72,7 +72,7 @@ _PATTERN_DEFS: list[tuple[str, re.Pattern[str], re.Pattern[str], float]] = [
             r"(?:mutation\s+date|नामांतरण\s+दिनांक|नामांतरण\s+तारीख|म्यूटेशन\s+डेट)",
             re.IGNORECASE,
         ),
-        re.compile(r"(\d{4}[./-]\d{1,2}[./-]\d{1,2})"),
+        re.compile(rf"({_DIGIT_CLASS}{{4}}[./-]{_DIGIT_CLASS}{{1,2}}[./-]{_DIGIT_CLASS}{{1,2}})"),
         0.90,
     ),
     (

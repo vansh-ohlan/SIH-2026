@@ -115,6 +115,26 @@ class TestPatternExtractor:
         result = extractor.extract(ocr)
         assert result.record.metadata.mutation_date.value == "2023-04-15"
 
+    def test_mutation_date_pattern_devanagari_digits(self) -> None:
+        ocr = _make_ocr_result({
+            1: [
+                ("नामांतरण दिनांक २०२३-०४-१५", 0.9, (0, 0, 10, 20)),
+            ]
+        })
+        extractor = PatternExtractor()
+        result = extractor.extract(ocr)
+        assert result.record.metadata.mutation_date.value == "२०२३-०४-१५"
+
+    def test_mutation_number_pattern_devanagari(self) -> None:
+        ocr = _make_ocr_result({
+            1: [
+                ("नामांतरण संख्या नामांतरण-१२३", 0.9, (0, 0, 10, 20)),
+            ]
+        })
+        extractor = PatternExtractor()
+        result = extractor.extract(ocr)
+        assert result.record.metadata.mutation_number.value == "नामांतरण-१२३"
+
     def test_area_pattern_fractional(self) -> None:
         ocr = _make_ocr_result({
             1: [
