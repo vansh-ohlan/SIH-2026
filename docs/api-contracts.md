@@ -221,15 +221,55 @@ Response 500: Internal inference failure
   "message": "Document inference failed."
 }
 
-Field notes:
-- confidence_score: overall pipeline confidence in [0.0, 1.0].
-- extraction_risk: low | medium | high based on validation and extraction confidence.
-- anomaly_score: Isolation Forest anomaly score. Negative or low values typically mean normal; high positive values indicate anomaly.
-- anomaly_risk: low | medium | high derived from anomaly score distribution.
-- explainability_evidence: optional field importance evidence from the explainability module.
-- Provenance fields: source_ocr_text, source_bbox, page_number, ocr_confidence, extraction_confidence, extraction_method, extractor_version.
+Field meanings:
+- extraction fields: structured fields extracted from the document, including metadata (document_id, state, district, village, khata/khewat numbers, year, document_type), landholders (name, father_or_husband_name, share, caste, address), and parcels (khasra_number, area_raw, area_normalized, area_unit, land_type, cultivation_status, irrigation_source, revenue, remarks). Each field has a value and optional provenance.
+- field provenance: traceability metadata for a field, including source_ocr_text (raw text from OCR), source_bbox (bounding box x1,y1,x2,y2), page_number, ocr_confidence (OCR engine confidence in [0.0, 1.0]), extraction_confidence (confidence that the extracted value is correct in [0.0, 1.0]), extraction_method (label, regex, spatial, table, ml, llm, manual, unknown), extractor_version, notes.
+- OCR confidence: the OCR engine's confidence in the recognized text, in [0.0, 1.0].
+- extraction confidence: confidence that the extracted structured value is correct, in [0.0, 1.0].
+- overall confidence: pipeline-level confidence_score in [0.0, 1.0], derived from validation and extraction confidence.
+- extraction risk: low, medium, or high. Derived from validation counts and extraction confidence. low means extraction is trustworthy, high means manual review is recommended.
+- anomaly score: Isolation Forest anomaly score. Negative or low values typically mean normal; high positive values indicate anomaly. Value range depends on model calibration.
+- anomaly risk: low, medium, or high. Derived from anomaly score distribution.
+- validation counts: validation_error_count and validation_warning_count from the validation layer.
+- conflicts: list of conflicting values from different extractors for the same field, e.g. [{"type": "area_mismatch", "values": {...}, "severity": "medium"}].
+- explainability_evidence: optional JSON-serializable evidence about which fields influenced the scoring or extraction, e.g. {"top_influences": [{"field": "area_normalized", "importance": 0.4}]}.
 
-## Shared conventions (all endpoints)
+Stable integration fields:
+- extraction_result.status
+- extraction_result.metadata (keys: document_id, state, district, tehsil, village, year, document_type, khata_number, khewat_number, khatoni_number, mutation_number, mutation_date, mutation_details)
+- extraction_result.landholders (keys: name, father_or_husband_name, caste, address, share, is_cultivator)
+- extraction_result.parcels (keys: khasra_number, area_raw, area_normalized, area_unit, land_classification, land_type, cultivation_status, irrigation_source, revenue, remarks)
+- extraction_result.unrecognized_text
+- extraction_result.warnings
+- extraction_result.conflicts
+- extraction_result.validation_error_count
+- extraction_result.validation_warning_count
+- confidence_score
+- extraction_risk (values: low, medium, high)
+- anomaly_score
+- anomaly_risk (values: low, medium, high)
+- explainability_evidence (top-level keys may evolve; consumers should treat it as opaque and display it rather than program against inner keys)
+
+Evolving fields:
+- anomaly_features: internal feature vector used for anomaly detection. Shape and semantics may change without notice. Do not depend on length or ordering.
+- explainability_evidence inner structure: field names and importance values may evolve as the explainability model changes. Treat as display-only unless explicitly versioned.
+- extraction_result.record and extraction_result.raw_ocr_result_summary may be added/removed in future versions.
+- Any new metadata keys added under state_specific_fields are optional and should be ignored by consumers that do not understand them.
+
+Error contract:
+All errors return a JSON body with this shape:
+{
+  "error": "snake_case_code",
+  "message": "human readable message"
+}
+
+Expected HTTP status codes:
+- 200 OK: Successful inference.
+- 400 Bad Request: Missing file, unsupported file type, or invalid request shape.
+- 422 Unprocessable Entity: Unreadable/invalid image, empty file, or OCR failure.
+- 500 Internal Server Error: Unexpected inference failure. Do not retry automatically; inspect error code and message.
+
+Shared conventions (all endpoints)
 
 - All timestamps ISO 8601 UTC.
 - All errors: { "error": "snake_case_code", "message": "human readable" }
@@ -243,3 +283,4 @@ Field notes:
 - [ ] ML has confirmed /ocr/extract request/response shape works with their pipeline output
 - [ ] GIS has confirmed /map/parcels GeoJSON shape matches what GeoServer/PostGIS will produce
 - [ ] Backend has reviewed POST /api/v1/inference/document contract and confirmed it is consumable
+- [ ] Backend has reviewed stable vs evolving field list and confirmed alignment
