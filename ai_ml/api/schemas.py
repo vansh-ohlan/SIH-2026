@@ -111,3 +111,11 @@ class HealthResponseSchema(BaseModel):
 
     status: str
     service: str
+
+
+class ReadinessResponseSchema(BaseModel):
+    """Readiness check response."""
+
+    status: str
+    service: str
+    checks: dict[str, Any] = Field(default_factory=dict)

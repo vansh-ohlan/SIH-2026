@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -10,6 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from ai_ml.analysis.result import AnalysisResult
+from ai_ml.api.config import APIConfig
 from ai_ml.extraction.schema import ExtractionResult
 from ai_ml.extraction.exceptions import InvalidOCRResultError
 from ai_ml.inference.document_inference import DocumentAIInference
@@ -267,3 +269,52 @@ class TestInferenceAPI:
         body = response.json()
         assert body["status"] == "ok"
         assert body["service"] == "ai-ml-inference"
+
+    def test_ready_endpoint_returns_status(self) -> None:
+        app = create_app(document_inference_service=_MockDocumentInferenceService())
+        client = TestClient(app)
+
+        response = client.get("/api/v1/ready")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["service"] == "ai-ml-inference"
+        assert "checks" in body
+        assert body["status"] in ("ready", "not_ready")
+
+    def test_oversized_upload_rejected(self, tmp_path: Path) -> None:
+        config = APIConfig(max_upload_size=10)
+        app = create_app(
+            document_inference_service=_MockDocumentInferenceService(),
+            api_config=config,
+        )
+        client = TestClient(app)
+
+        response = client.post(
+            "/api/v1/inference/document",
+            files={"file": ("big.png", BytesIO(b"x" * 11), "image/png")},
+        )
+
+        assert response.status_code == 400
+        body = response.json()
+        assert body["detail"]["error"] == "file_too_large"
+
+    def test_custom_allowed_extensions_enforced(self, tmp_path: Path) -> None:
+        config = APIConfig(allowed_extensions=(".png",))
+        app = create_app(
+            document_inference_service=_MockDocumentInferenceService(),
+            api_config=config,
+        )
+        client = TestClient(app)
+
+        jpg_path = tmp_path / "doc.jpg"
+        jpg_path.write_bytes(b"fake-image-bytes")
+        with open(jpg_path, "rb") as fh:
+            response = client.post(
+                "/api/v1/inference/document",
+                files={"file": ("doc.jpg", fh, "image/jpeg")},
+            )
+
+        assert response.status_code == 400
+        body = response.json()
+        assert body["detail"]["error"] == "unsupported_file_type"
