@@ -58,13 +58,11 @@ class PaddleOCREngine(OCREngine):
             ) from exc
 
         lang = self._resolve_language(self._config.languages)
-        use_gpu = self._config.device == "gpu"
 
         try:
             self._paddle_ocr = PaddleOCR(
                 lang=lang,
-                use_gpu=use_gpu,
-                show_log=False,
+                device="cpu",
             )
         except Exception as exc:
             raise OCREngineUnavailableError(
