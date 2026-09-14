@@ -42,9 +42,7 @@ class TestOCRPaddleAvailable:
         assert _check_paddleocr_available() is True
 
     def test_returns_false_when_paddleocr_missing(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delitem(sys.modules, "paddleocr", raising=False)
-        if "paddleocr" in sys.modules:
-            del sys.modules["paddleocr"]
+        monkeypatch.setitem(sys.modules, "paddleocr", None)
         assert _check_paddleocr_available() is False
 
 

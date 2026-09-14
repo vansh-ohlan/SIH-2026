@@ -257,7 +257,15 @@ class TestPaddleOCREngineInit:
             engine._initialize()
             mock_cls.assert_called_once()
             kwargs = mock_cls.call_args.kwargs
-            assert kwargs.get("use_gpu") is False
+            assert kwargs.get("device") == "cpu"
+
+    def test_constructor_does_not_pass_show_log(self) -> None:
+        mock_cls = MagicMock()
+        with patch.dict("sys.modules", {"paddleocr": MagicMock(PaddleOCR=mock_cls)}):
+            engine = PaddleOCREngine(OCRConfig())
+            engine._initialize()
+            kwargs = mock_cls.call_args.kwargs
+            assert "show_log" not in kwargs
 
 
 class TestPaddleOCREngineRecognize:
