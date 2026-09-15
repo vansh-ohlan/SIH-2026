@@ -3,19 +3,23 @@
 from __future__ import annotations
 
 import logging
+import tempfile
 from pathlib import Path
-from typing import Annotated
+from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 
 from backend.app.config import BackendConfig
+from backend.app.db import get_db
 from backend.app.schemas import (
     BackendErrorResponse,
     HealthResponse,
     AIReadinessResponse,
 )
 from backend.app.services import AIServiceWrapper, AIServiceError
+from backend.app.repositories import LandRecordRepository
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +67,7 @@ def ai_readiness() -> AIReadinessResponse:
 @router.post(
     "/documents/upload",
     responses={
-        200: {"description": "Successful AI inference"},
+        200: {"description": "Successful AI inference + persistence"},
         400: {"model": BackendErrorResponse, "description": "Invalid request"},
         413: {"model": BackendErrorResponse, "description": "File too large"},
         422: {"model": BackendErrorResponse, "description": "Unprocessable document"},
@@ -75,16 +79,20 @@ async def upload_document(
     file: UploadFile = File(..., description="Scanned RoR / Jamabandi document image"),
     config: BackendConfig = Depends(get_config),
     ai_service: AIServiceWrapper = Depends(get_ai_service_dep),
+    db: Session = Depends(get_db),
 ) -> JSONResponse:
-    """Upload a land-record document for AI inference.
+    """Upload a land-record document for AI inference and persistence.
+
+    Flow: Upload → AIInferenceClient → AnalysisResponse → Database → Response
 
     Args:
         file: Multipart form file (image).
         config: Backend configuration.
         ai_service: AI service wrapper (injectable).
+        db: Database session.
 
     Returns:
-        AnalysisResponse from the AI service.
+        Persisted land record with analysis result.
     """
     # Validate file presence
     if file is None or file.filename is None or file.filename.strip() == "":
@@ -121,8 +129,6 @@ async def upload_document(
         )
 
     # Save to temp file for AI client
-    import tempfile
-
     temp_path = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -143,11 +149,34 @@ async def upload_document(
                 },
             ) from exc
 
+        # Persist to database
+        repo = LandRecordRepository(db)
+        try:
+            record = repo.create(result)
+        except Exception as exc:
+            logger.error("Failed to persist land record: %s", exc)
+            db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "error": "persistence_failed",
+                    "message": "Failed to store land record.",
+                },
+            ) from exc
+
+        # Build response
         if hasattr(result, "model_dump"):
-            content = result.model_dump(mode="json")
+            analysis_data = result.model_dump(mode="json")
         else:
-            content = result
-        return JSONResponse(status_code=200, content=content)
+            analysis_data = result
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "record_id": record.id,
+                "analysis": analysis_data,
+            },
+        )
     finally:
         if temp_path is not None and temp_path.exists():
             try:

@@ -102,8 +102,9 @@ class TestDocumentUpload:
             )
         assert res.status_code == 200
         payload = res.json()
-        assert payload["extraction_result"]["status"] == "success"
-        assert payload["confidence_score"] == 0.95
+        analysis = payload.get("analysis", payload)
+        assert analysis["extraction_result"]["status"] == "success"
+        assert analysis["confidence_score"] == 0.95
 
     def test_unsupported_file_type(self, tmp_path):
         txt_path = tmp_path / "test.txt"
