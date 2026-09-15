@@ -15,6 +15,7 @@ export interface IParcelRepository {
   search(query: string): Promise<ParcelSearchResult[]>;
   findConflictsByUlpid(ulpid: string): Promise<ConflictItem[]>;
   getAllGeoJson(): Promise<GeoJsonFeatureCollection>;
+  getCalculatedAreaSqm?(ulpid: string): Promise<number | null>;
 }
 
 // Default production repository is PostgreSQL + PostGIS
