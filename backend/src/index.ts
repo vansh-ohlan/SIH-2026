@@ -2,6 +2,7 @@ import http from 'http';
 import { createApp } from './app/createApp';
 import { config } from './config';
 import { logger } from './utils/logger';
+import { db } from './db/pool';
 
 const app = createApp();
 const server = http.createServer(app);
@@ -25,8 +26,15 @@ server.listen(PORT, () => {
   logger.info(`Allowed CORS origin: ${config.CORS_ORIGIN}`);
 });
 
-function handleShutdown(signal: string) {
+async function handleShutdown(signal: string) {
   logger.info(`Received ${signal}. Gracefully shutting down Bhu-Setu API server...`);
+  
+  try {
+    await db.close();
+  } catch (dbErr) {
+    logger.error('Error closing database pool', { error: (dbErr as Error).message });
+  }
+
   server.close((err) => {
     if (err) {
       logger.error('Error during server shutdown', { error: err.message });

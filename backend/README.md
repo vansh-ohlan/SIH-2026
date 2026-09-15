@@ -10,6 +10,9 @@ This service acts as a non-disruptive integration layer connecting legacy state 
 
 - **Node.js**: v20.0.0+ (Tested on v25.9.0)
 - **npm**: v10.0.0+
+- **PostgreSQL & PostGIS**:
+  - Option A: **Docker / Docker Compose** (Recommended)
+  - Option B: **Native PostgreSQL with PostGIS extension** (Homebrew / apt)
 
 ---
 
@@ -32,6 +35,64 @@ This service acts as a non-disruptive integration layer connecting legacy state 
 
 ---
 
+## 🗄️ PostgreSQL + PostGIS Setup
+
+### Option A: Using Docker Compose (Recommended)
+
+Start the official PostgreSQL + PostGIS container in detached mode:
+```bash
+docker compose up -d
+```
+
+Verify container health:
+```bash
+docker compose ps
+```
+
+Stop the database container when finished:
+```bash
+docker compose down
+```
+
+### Option B: Using Native / Homebrew PostgreSQL
+
+1. Install PostGIS:
+   - **macOS (Homebrew)**: `brew install postgis`
+   - **Ubuntu/Debian**: `sudo apt-get install -y postgresql-16-postgis-3`
+
+2. Create the database and user:
+   ```bash
+   createdb bhusetu_db
+   ```
+
+3. Configure `.env` to match your local connection string:
+   ```env
+   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/bhusetu_db
+   ```
+
+---
+
+## 📦 Database Migrations & Seeding
+
+The backend includes a migration engine that tracks schema versions in `schema_migrations`.
+
+1. **Run Migrations (creates PostGIS extension, parcels, mutations, and indexes):**
+   ```bash
+   npm run db:migrate
+   ```
+
+2. **Seed Synthetic Demo Data:**
+   ```bash
+   npm run db:seed
+   ```
+
+3. **Reset and Re-seed (Fresh State):**
+   ```bash
+   npm run db:reset
+   ```
+
+---
+
 ## ⚙️ Environment Variables
 
 | Variable | Default | Description |
@@ -39,7 +100,7 @@ This service acts as a non-disruptive integration layer connecting legacy state 
 | `PORT` | `5000` | HTTP port for the API server |
 | `NODE_ENV` | `development` | Environment mode (`development`, `production`, `test`) |
 | `CORS_ORIGIN` | `http://localhost:3000` | Allowed frontend origin for CORS |
-| `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/bhusetu_db` | Connection string for PostgreSQL / PostGIS (Stage 2) |
+| `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/bhusetu_db` | Connection string for PostgreSQL / PostGIS |
 | `AI_ML_SERVICE_URL` | `http://localhost:8000` | URL of the AI/ML microservice (Stage 3) |
 | `GEOSERVER_URL` | `http://localhost:8080/geoserver` | URL of GeoServer instance (Stage 2/3) |
 
@@ -75,12 +136,12 @@ This service acts as a non-disruptive integration layer connecting legacy state 
 
 ## 🧪 Running Tests
 
-- **Run full test suite:**
+- **Run full test suite (11 test suites / 38 unit & integration tests):**
   ```bash
   npm test
   ```
 
-- **Run with code coverage:**
+- **Run with code coverage report:**
   ```bash
   npm run test:coverage
   ```
@@ -173,7 +234,7 @@ Base URL: `http://localhost:5000/api`
   {
     "status": "recorded",
     "audit_hash": "b2f6b8...",
-    "timestamp": "2026-09-12T14:18:25.000Z"
+    "timestamp": "2026-09-15T10:15:00.000Z"
   }
   ```
 
@@ -230,7 +291,9 @@ Base URL: `http://localhost:5000/api`
 
 ---
 
-## 📊 Mock/Demo Status
+## 🏛️ PostGIS Spatial Design & SRID
 
-- All records currently returned by default are synthetic mock data for the SIH 2026 demo.
-- Data access is cleanly decoupled via repository interfaces (`IParcelRepository`, `IMutationRepository`), preparing for seamless PostGIS and PostgreSQL database binding in Stage 2.
+- **Spatial Reference System**: **EPSG:4326 (WGS 84)** is used for all geometry columns (`geometry(Polygon, 4326)`).
+- **Indexing**: Spatial GiST index `idx_parcels_geometry` is applied for sub-millisecond bounding box and intersection queries.
+- **Centroid Queries**: Centroids for parcel searches are computed in PostGIS using `ROUND(ST_Y(ST_Centroid(geometry))::numeric, 4)` and `ROUND(ST_X(ST_Centroid(geometry))::numeric, 4)`.
+- **Tamper-Evident Audit Trail**: Mutation decisions calculate a SHA-256 hash chained to the previous mutation record for that parcel, ensuring cryptographic immutability without blockchain overhead.
