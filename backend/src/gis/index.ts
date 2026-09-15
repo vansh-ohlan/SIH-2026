@@ -1,8 +1,15 @@
+import { PolygonGeometry } from '../models/parcel';
+
 /**
- * GIS Core Engine Abstraction
+ * GIS Integration Layer & Boundaries — Bhu-Setu
  *
- * Prepares the backend for GeoServer and PostGIS integrations in subsequent stages.
- * Provides spatial utilities, projection helpers, and conflict geometry calculations.
+ * OWNER & BOUNDARY:
+ * - The GIS teammate owns spatial processing, GeoServer / QGIS workflows,
+ *   cadastral map vectorization, and advanced spatial conflict algorithms.
+ * - The Backend owns HTTP API endpoints, database persistence (PostgreSQL/PostGIS),
+ *   and GeoJSON serialization via `/api/map/parcels` and `/api/parcel/:ulpid`.
+ * - ULPID (Unique Land Parcel Identification Number) is the common integration key.
+ * - Geometry standard: PostGIS Polygon with SRID 4326 (WGS 84, GeoJSON standard).
  */
 
 export interface BoundingBox {
@@ -12,17 +19,30 @@ export interface BoundingBox {
   maxLat: number;
 }
 
-export class GisEngine {
+export interface SpatialConflictResult {
+  hasConflict: boolean;
+  type?: string;
+  description?: string;
+  severity?: 'low' | 'medium' | 'high';
+  overlapAreaSqm?: number;
+}
+
+export interface IGisService {
+  calculateBBox(geometry: PolygonGeometry): BoundingBox;
+}
+
+export class GisService implements IGisService {
   /**
    * Calculates the bounding box for a set of polygon coordinates.
+   * Useful for map zoom extent calculation and viewport queries.
    */
-  public calculateBBox(coordinates: number[][][]): BoundingBox {
+  public calculateBBox(geometry: PolygonGeometry): BoundingBox {
     let minLng = Infinity;
     let minLat = Infinity;
     let maxLng = -Infinity;
     let maxLat = -Infinity;
 
-    for (const ring of coordinates) {
+    for (const ring of geometry.coordinates) {
       for (const [lng, lat] of ring) {
         if (lng < minLng) minLng = lng;
         if (lat < minLat) minLat = lat;
@@ -33,14 +53,6 @@ export class GisEngine {
 
     return { minLng, minLat, maxLng, maxLat };
   }
-
-  /**
-   * Stub method for spatial overlap detection between two parcels.
-   */
-  public checkOverlap(_poly1: number[][][], _poly2: number[][][]): boolean {
-    // In Stage 2/3, this will execute ST_Intersects / ST_Overlaps queries via PostGIS.
-    return false;
-  }
 }
 
-export const gisEngine = new GisEngine();
+export const gisService = new GisService();
