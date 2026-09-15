@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+import cv2
 import numpy as np
 
 from ai_ml.ocr.config import OCRConfig
@@ -63,6 +64,9 @@ class PaddleOCREngine(OCREngine):
             self._paddle_ocr = PaddleOCR(
                 lang=lang,
                 device="cpu",
+                use_doc_orientation_classify=False,
+                use_doc_unwarping=False,
+                use_textline_orientation=False,
             )
         except Exception as exc:
             raise OCREngineUnavailableError(
@@ -110,6 +114,14 @@ class PaddleOCREngine(OCREngine):
             raise OCRImageError("Cannot run OCR on an empty image.")
 
         self._initialize()
+
+        # PaddleOCR 3.x expects a 3-channel BGR image. Convert grayscale to BGR.
+        if image.ndim == 2:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        elif image.ndim == 3 and image.shape[2] == 1:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        elif image.ndim == 3 and image.shape[2] == 3:
+            pass  # Already BGR
 
         try:
             raw_results = self._paddle_ocr.predict(input=image)
@@ -193,6 +205,10 @@ class PaddleOCREngine(OCREngine):
             raise OCRParsingError(
                 f"PaddleOCR page data is not a dict: {type(page_data)}"
             )
+
+        # PaddleOCR 3.x nests the actual result under a 'res' key
+        if "res" in page_data and isinstance(page_data["res"], dict):
+            page_data = page_data["res"]
 
         required_keys = {"rec_texts", "rec_boxes", "rec_scores"}
         missing = required_keys - set(page_data.keys())

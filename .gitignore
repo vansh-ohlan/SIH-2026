@@ -22,3 +22,41 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+# Python virtual environments
+.venv/
+.venv-wsl/
+venv/
+env/
+
+# Python version files
+.python-version
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# PaddleOCR / PaddlePaddle model caches
+.paddlex/
+.paddleocr/
+paddle_models/
+
+# Temporary scripts and artifacts
+get-pip.py
+structure.txt
+tmp/
+temp/
+
+# Generated OCR outputs
+*.ocr.json
+*_ocr_output*
+
+# Local datasets and raw documents
+data/raw/
+datasets/
+
+# Python bytecode cache
+__pycache__/
+*.py[cod]

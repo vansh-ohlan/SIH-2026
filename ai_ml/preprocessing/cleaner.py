@@ -1,5 +1,7 @@
 """Image cleaning operations for scanned RoR documents."""
 
+from __future__ import annotations
+
 from typing import Optional
 
 import cv2
