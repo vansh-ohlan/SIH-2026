@@ -10,7 +10,9 @@ const configSchema = z.object({
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
   DATABASE_URL: z.string().default('postgresql://postgres:postgres@localhost:5432/bhusetu_db'),
   AI_ML_SERVICE_URL: z.string().default('http://localhost:8000'),
-  GEOSERVER_URL: z.string().default('http://localhost:8080/geoserver')
+  GEOSERVER_URL: z.string().default('http://localhost:8080/geoserver'),
+  JWT_SECRET: z.string().default('bhu-setu-dev-jwt-secret-2026'),
+  JWT_EXPIRES_IN: z.string().default('1h')
 });
 
 const parsedConfig = configSchema.safeParse(process.env);

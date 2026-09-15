@@ -50,3 +50,18 @@ export class UnreadableDocumentError extends AppError {
     this.name = 'UnreadableDocumentError';
   }
 }
+
+export class UnauthorizedError extends AppError {
+  constructor(message = 'Authentication token is missing or invalid', errorCode = 'unauthorized') {
+    super(401, errorCode, message);
+    this.name = 'UnauthorizedError';
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message = 'Insufficient permissions to perform this action', errorCode = 'forbidden') {
+    super(403, errorCode, message);
+    this.name = 'ForbiddenError';
+  }
+}
+
