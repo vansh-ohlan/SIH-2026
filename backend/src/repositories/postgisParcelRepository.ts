@@ -7,6 +7,7 @@ import {
   PolygonGeometry
 } from '../models/parcel';
 import { GeoJsonFeatureCollection } from '../models/geojson';
+import { gisEngine } from '../gis';
 
 interface ParcelRow {
   ulpid: string;
@@ -138,17 +139,26 @@ export class PostgisParcelRepository implements IParcelRepository {
     }
 
     const { ror_area_sqm, surveyed_area_sqm } = res.rows[0];
-    if (Math.abs(ror_area_sqm - surveyed_area_sqm) > 0.01) {
-      return [
-        {
-          type: 'area_mismatch',
-          description: `RoR area (${Math.round(ror_area_sqm)} sqm) does not match surveyed area (${Math.round(surveyed_area_sqm)} sqm)`,
-          severity: 'medium'
-        }
-      ];
-    }
+    const conflict = gisEngine.detectAreaMismatch(ror_area_sqm, surveyed_area_sqm);
+    return conflict ? [conflict] : [];
+  }
 
-    return [];
+  /**
+   * Calculates geodesic surface area in square metres using PostGIS ST_Area(geometry::geography).
+   * Verifies that EPSG:4326 geometry is computed as spherical/ellipsoidal coordinates rather than planar degrees.
+   */
+  public async getCalculatedAreaSqm(ulpid: string): Promise<number | null> {
+    const sql = `
+      SELECT ST_Area(geometry::geography)::float AS calculated_area_sqm
+      FROM parcels
+      WHERE ulpid = $1;
+    `;
+
+    const res = await db.query<{ calculated_area_sqm: number }>(sql, [ulpid]);
+    if (res.rows.length === 0) {
+      return null;
+    }
+    return res.rows[0].calculated_area_sqm;
   }
 
   public async getAllGeoJson(): Promise<GeoJsonFeatureCollection> {
