@@ -136,7 +136,7 @@ The backend includes a migration engine that tracks schema versions in `schema_m
 
 ## 🧪 Running Tests
 
-- **Run full test suite (12 test suites / 39 unit & integration tests):**
+- **Run full test suite (14 test suites / 56 unit & integration tests):**
   ```bash
   npm test
   ```
@@ -218,8 +218,9 @@ Base URL: `http://localhost:5000/api`
   ]
   ```
 
-### 5. Submit Mutation Decision
+### 5. Submit Mutation Decision (Protected)
 - **Endpoint**: `POST /api/mutation/{ulpid}`
+- **Authentication**: `Authorization: Bearer <token>` *(Requires `revenue_officer`, `registrar`, or `admin` role)*
 - **Request Body**:
   ```json
   {
@@ -237,8 +238,57 @@ Base URL: `http://localhost:5000/api`
     "timestamp": "2026-09-15T10:15:00.000Z"
   }
   ```
+- **Response 401**:
+  ```json
+  { "error": "unauthorized", "message": "Authentication token is missing or invalid" }
+  ```
+- **Response 403**:
+  ```json
+  { "error": "forbidden", "message": "Insufficient permissions. Required role(s): revenue_officer, registrar, admin" }
+  ```
 
-### 6. OCR Document Extraction
+### 6. Generate Development Token (Mock Auth)
+- **Endpoint**: `POST /api/auth/dev-token`
+- **Request Body**:
+  ```json
+  {
+    "role": "revenue_officer",
+    "userId": "OFF-102",
+    "name": "Officer Sharma",
+    "officerId": "OFF-102"
+  }
+  ```
+  *(Allowed `role` values: `citizen`, `revenue_officer`, `registrar`, `admin`)*
+- **Response 200**:
+  ```json
+  {
+    "token": "eyJhbGciOiJIUzI1NiIsIn...",
+    "expiresIn": "1h",
+    "user": {
+      "role": "revenue_officer",
+      "userId": "OFF-102",
+      "name": "Officer Sharma",
+      "officerId": "OFF-102"
+    }
+  }
+  ```
+
+### 7. Get Authenticated User Context
+- **Endpoint**: `GET /api/auth/me`
+- **Authentication**: `Authorization: Bearer <token>`
+- **Response 200**:
+  ```json
+  {
+    "user": {
+      "userId": "OFF-102",
+      "role": "revenue_officer",
+      "name": "Officer Sharma",
+      "officerId": "OFF-102"
+    }
+  }
+  ```
+
+### 8. OCR Document Extraction
 - **Endpoint**: `POST /api/ocr/extract`
 - **Content-Type**: `multipart/form-data`
 - **Field**: `file` (Image/PDF upload)
@@ -256,7 +306,7 @@ Base URL: `http://localhost:5000/api`
   { "error": "unreadable_document", "message": "OCR could not extract required fields" }
   ```
 
-### 7. Get Map Parcels (GeoJSON)
+### 9. Get Map Parcels (GeoJSON)
 - **Endpoint**: `GET /api/map/parcels`
 - **Response 200**:
   ```json
@@ -274,6 +324,31 @@ Base URL: `http://localhost:5000/api`
     ]
   }
   ```
+
+---
+
+## 🔐 Authentication & Role-Based Access Control (RBAC)
+
+The Bhu-Setu API Gateway employs lightweight, standard JWT Bearer authentication (`Authorization: Bearer <token>`) designed for SIH hackathon demonstration and role switching without requiring live Aadhaar, DigiLocker, OTP, or external identity providers.
+
+### Supported Roles & Permissions Matrix
+
+| Role | View Parcels & Map | View Conflicts | Submit Mutation Decision | Administrative Actions |
+| :--- | :---: | :---: | :---: | :---: |
+| `citizen` | ✅ | ✅ | ❌ *(403 Forbidden)* | ❌ |
+| `revenue_officer` | ✅ | ✅ | ✅ *(Recorded + Chained)* | ❌ |
+| `registrar` | ✅ | ✅ | ✅ *(Recorded + Chained)* | ❌ |
+| `admin` | ✅ | ✅ | ✅ *(Full Override)* | ✅ |
+
+### Key Security & Architectural Principles
+1. **Bearer Token Authentication**: Reusable `authenticate` middleware parses and cryptographically validates tokens using `JWT_SECRET`.
+2. **Declarative RBAC**: `requireRole('revenue_officer', 'registrar', 'admin')` protects officer-only mutations and governance workflows.
+3. **Protected Mutation Workflow**:
+   - `POST /api/mutation/:ulpid` is protected by RBAC; client-provided `officer_id` is validated alongside authenticated user context.
+   - Unauthorized attempts return standard `401 Unauthorized` or `403 Forbidden`.
+4. **Tamper-Evident SHA-256 Hash Chain**: Mutation decisions compute and chain cryptographic audit hashes (`audit_hash`) to the previous mutation record in PostgreSQL, ensuring non-repudiation and immutable auditability without blockchain overhead.
+5. **Development & Demo Utility**: Use `POST /api/auth/dev-token` with `{ "role": "<role_name>" }` to instantaneously generate JWT tokens for demonstrating different stakeholder viewpoints.
+6. **Production Outlook**: In full production deployment, the mock JWT generator would be backed by National Single Sign-On (MeriPehchaan) and departmental SSO providers. Aadhaar/DigiLocker integrations are explicitly avoided in this SIH prototype.
 
 ---
 
@@ -312,4 +387,5 @@ Base URL: `http://localhost:5000/api`
 2. **Geometry Standard**: PostGIS `GEOMETRY(Polygon, 4326)` (WGS 84, standard GeoJSON `[longitude, latitude]` coordinate order).
 3. **GeoJSON Exposure**: `GET /api/map/parcels` returns standard GeoJSON `FeatureCollection` with `properties: { ulpid, land_use }` for direct frontend/GIS client consumption.
 4. **Backend Abstraction**: `GisService` in `src/gis/` provides clean bounding box (`calculateBBox`) utilities and integration types (`SpatialConflictResult`) without duplicating GIS spatial processing algorithms.
+
 
