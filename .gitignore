@@ -48,6 +48,7 @@ get-pip.py
 structure.txt
 tmp/
 temp/
+tmp_*.py
 
 # Generated OCR outputs
 *.ocr.json
@@ -60,3 +61,9 @@ datasets/
 # Python bytecode cache
 __pycache__/
 *.py[cod]
+
+# SQLite databases (development and runtime)
+*.db
+*.sqlite
+*.sqlite3
+bhusetu_dev.db
