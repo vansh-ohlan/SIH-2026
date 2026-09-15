@@ -4,12 +4,15 @@ import {
   Conflict,
   MutationDecisionRequest,
   MutationDecisionResponse,
-  OcrResult,
   GeoFeatureCollection,
+  DevTokenResponse,
+  AuthUser,
+  UserRole,
   PilotRegion,
   RegionId,
   EncroachmentAlert,
   UtilityLine,
+  OcrResult,
 } from "./types";
 import {
   MOCK_PARCELS,
@@ -22,30 +25,63 @@ import {
   MOCK_UTILITIES,
 } from "./mockData";
 
-// Point this at Backend once their stub routes are live — nothing else in
-// the app needs to change, since every function below returns the exact
-// shape defined in api_contracts.md whether it hits the real API or mocks.
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:5000/api";
 
-const DUMMY_TOKEN = "demo-token";
-
-async function tryFetch<T>(path: string, init?: RequestInit): Promise<T | null> {
+export async function checkBackendConnection(): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE_URL}${path}`, {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${DUMMY_TOKEN}`,
-        ...(init?.headers ?? {}),
-      },
-      // Keep demo snappy — don't hang the UI waiting on a backend that
-      // isn't up yet.
-      signal: AbortSignal.timeout(2500),
+    const res = await fetch(`${BASE_URL}/parcel/search?q=PB`, {
+      signal: AbortSignal.timeout(1500),
     });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function getStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem("bhu_setu_token");
   } catch {
     return null;
+  }
+}
+
+async function tryFetch<T>(
+  path: string,
+  init?: RequestInit,
+  customToken?: string
+): Promise<{ data: T | null; status: number; error?: string }> {
+  try {
+    const token = customToken || getStoredToken();
+    const headers: Record<string, string> = {
+      ...(init?.headers as Record<string, string>),
+    };
+
+    if (token && !headers["Authorization"]) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(`${BASE_URL}${path}`, {
+      ...init,
+      headers,
+      signal: AbortSignal.timeout(3000),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => null);
+      return {
+        data: null,
+        status: res.status,
+        error: errBody?.message || errBody?.error || `HTTP ${res.status}`,
+      };
+    }
+
+    const json = (await res.json()) as T;
+    return { data: json, status: res.status };
+  } catch {
+    return { data: null, status: 0, error: "Network connection failed" };
   }
 }
 
@@ -53,81 +89,192 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+// 1. Get Parcel Details: GET /api/parcel/{ulpid}
 export async function getParcel(ulpid: string): Promise<Parcel | null> {
-  const live = await tryFetch<Parcel>(`/parcel/${ulpid}`);
-  if (live) return live;
-  await sleep(150);
+  const { data } = await tryFetch<Parcel>(`/parcel/${ulpid}`);
+  if (data) return data;
+  await sleep(100);
   return MOCK_PARCELS[ulpid] ?? null;
 }
 
+// 2. Search Parcels: GET /api/parcel/search?q={query}
 export async function searchParcels(q: string): Promise<SearchResult[]> {
-  const live = await tryFetch<SearchResult[]>(
-    `/parcel/search?q=${encodeURIComponent(q)}`
-  );
-  if (live) return live;
-  await sleep(150);
-  const query = q.trim().toLowerCase();
+  const query = q.trim();
   if (!query) return [];
+
+  const { data } = await tryFetch<SearchResult[]>(
+    `/parcel/search?q=${encodeURIComponent(query)}`
+  );
+  if (data) return data;
+
+  await sleep(100);
+  const lower = query.toLowerCase();
   return MOCK_SEARCH_INDEX.filter(
     (r) =>
-      r.name.toLowerCase().includes(query) ||
-      r.ulpid.toLowerCase().includes(query)
+      r.name.toLowerCase().includes(lower) ||
+      r.ulpid.toLowerCase().includes(lower)
   );
 }
 
+// 3. Get Parcel Conflicts: GET /api/parcel/{ulpid}/conflicts
 export async function getConflicts(ulpid: string): Promise<Conflict[]> {
-  const live = await tryFetch<Conflict[]>(`/parcel/${ulpid}/conflicts`);
-  if (live) return live;
-  await sleep(120);
+  const { data } = await tryFetch<Conflict[]>(`/parcel/${ulpid}/conflicts`);
+  if (data) return data;
+  await sleep(100);
   return MOCK_CONFLICTS[ulpid] ?? [];
 }
 
+// 4. Submit Mutation Decision: POST /api/mutation/{ulpid}
 export async function postMutationDecision(
   ulpid: string,
   body: MutationDecisionRequest
 ): Promise<MutationDecisionResponse> {
-  const live = await tryFetch<MutationDecisionResponse>(`/mutation/${ulpid}`, {
+  const res = await tryFetch<MutationDecisionResponse>(`/mutation/${ulpid}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (live) return live;
-  await sleep(300);
-  // Mimic the chained SHA-256 audit hash described in the contract closely
-  // enough for a convincing demo.
-  const fake = Array.from({ length: 16 }, () =>
+
+  if (res.data) {
+    return res.data;
+  }
+
+  if (res.status === 401) {
+    throw new Error("Authentication required (401). Please sign in as an officer.");
+  }
+  if (res.status === 403) {
+    throw new Error("Insufficient permissions (403). Only revenue officers, registrars, or admins can approve mutations.");
+  }
+  if (res.status === 404) {
+    throw new Error(`Parcel ${ulpid} not found (404).`);
+  }
+
+  // Graceful fallback for offline demo
+  await sleep(350);
+  const fakeHash = Array.from({ length: 64 }, () =>
     Math.floor(Math.random() * 16).toString(16)
   ).join("");
+
   return {
     status: "recorded",
-    audit_hash: `${fake}...`,
+    audit_hash: fakeHash,
     timestamp: new Date().toISOString(),
   };
 }
 
+// 5. Get Map Parcels (GeoJSON): GET /api/map/parcels
+export async function getMapParcels(): Promise<GeoFeatureCollection> {
+  const { data } = await tryFetch<GeoFeatureCollection>(`/map/parcels`);
+  if (data) return data;
+  await sleep(100);
+  return MOCK_GEOJSON;
+}
+
+// 6. Regional Map Parcels
+export async function getPilotRegions(): Promise<PilotRegion[]> {
+  return PILOT_REGIONS;
+}
+
+export async function getMapParcelsByRegion(
+  regionId: RegionId
+): Promise<GeoFeatureCollection> {
+  const { data } = await tryFetch<GeoFeatureCollection>(
+    `/map/parcels?region=${regionId}`
+  );
+  if (data) return data;
+  await sleep(100);
+  return MOCK_REGIONAL_GEOJSON[regionId] ?? MOCK_GEOJSON;
+}
+
+export async function getEncroachmentAlerts(
+  regionId?: RegionId
+): Promise<EncroachmentAlert[]> {
+  await sleep(100);
+  if (!regionId) return MOCK_ENCROACHMENT_ALERTS;
+  return MOCK_ENCROACHMENT_ALERTS.filter((a) => a.region_id === regionId);
+}
+
+export async function getUtilityLines(
+  regionId?: RegionId
+): Promise<UtilityLine[]> {
+  await sleep(100);
+  if (!regionId) return MOCK_UTILITIES;
+  return MOCK_UTILITIES.filter((u) => u.region_id === regionId);
+}
+
+// 7. Development Token Generation: POST /api/auth/dev-token
+export async function generateDevToken(
+  role: UserRole,
+  customData?: { userId?: string; name?: string; officerId?: string }
+): Promise<DevTokenResponse> {
+  const { data } = await tryFetch<DevTokenResponse>(`/auth/dev-token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      role,
+      userId: customData?.userId,
+      name: customData?.name,
+      officerId: customData?.officerId,
+    }),
+  });
+
+  if (data) return data;
+
+  // Offline mock fallback
+  const defaultNames: Record<UserRole, string> = {
+    citizen: "Citizen User",
+    revenue_officer: "Officer Sharma",
+    registrar: "Sub-Registrar Verma",
+    admin: "System Administrator",
+  };
+
+  const defaultIds: Record<UserRole, string> = {
+    citizen: "CIT-101",
+    revenue_officer: "OFF-102",
+    registrar: "REG-201",
+    admin: "ADM-999",
+  };
+
+  const user: AuthUser = {
+    role,
+    userId: customData?.userId || defaultIds[role],
+    name: customData?.name || defaultNames[role],
+    officerId: customData?.officerId || (role !== "citizen" ? defaultIds[role] : undefined),
+  };
+
+  return {
+    token: `demo-jwt-token-for-${role}-${Date.now()}`,
+    expiresIn: "1h",
+    user,
+  };
+}
+
+// 8. Get Authenticated Context: GET /api/auth/me
+export async function getAuthMe(token?: string): Promise<AuthUser | null> {
+  const { data } = await tryFetch<{ user: AuthUser }>(`/auth/me`, undefined, token);
+  return data?.user ?? null;
+}
+
+// 9. OCR Extraction & Verification Helpers
 export async function extractOcr(
   file: File | { name: string; preset?: "punjab_jamabandi" | "tamil_nadu_patta" }
 ): Promise<OcrResult | null> {
-  const isTamilNadu =
-    (typeof file.name === "string" &&
-      file.name.toLowerCase().includes("tamil")) ||
-    (typeof file.name === "string" &&
-      file.name.toLowerCase().includes("patta")) ||
-    ("preset" in file && file.preset === "tamil_nadu_patta");
-
-  // Attempt real live backend if available
   if (file instanceof File) {
     const form = new FormData();
     form.append("file", file);
-    const live = await tryFetch<OcrResult>(`/ocr/extract`, {
+    const { data } = await tryFetch<OcrResult>(`/ocr/extract`, {
       method: "POST",
       body: form,
     });
-    if (live) return live;
+    if (data) return data;
   }
 
-  // Realistic mock inference latency
-  await sleep(650);
+  await sleep(400);
+
+  const isTamilNadu =
+    (typeof file.name === "string" && file.name.toLowerCase().includes("tamil")) ||
+    (typeof file.name === "string" && file.name.toLowerCase().includes("patta")) ||
+    ("preset" in file && file.preset === "tamil_nadu_patta");
 
   if (isTamilNadu) {
     return {
@@ -142,52 +289,9 @@ export async function extractOcr(
       sub_division: "Block 4, Sriperumbudur Taluk",
       cadastral_survey_area: 3200,
       area_discrepancy_sqm: 0,
-      bounding_boxes: [
-        {
-          field: "patta_no",
-          label: "Patta Number",
-          value: "PAT-84102",
-          confidence: 0.96,
-          top: "18%",
-          left: "64%",
-          width: "28%",
-          height: "6%",
-        },
-        {
-          field: "owner",
-          label: "Registered Pattadhar",
-          value: "K. Venkatesan",
-          confidence: 0.95,
-          top: "32%",
-          left: "14%",
-          width: "48%",
-          height: "7%",
-        },
-        {
-          field: "survey_no",
-          label: "Survey & Sub-division",
-          value: "284/1B",
-          confidence: 0.93,
-          top: "47%",
-          left: "14%",
-          width: "36%",
-          height: "7%",
-        },
-        {
-          field: "area",
-          label: "Extent (Hectares/Sqm)",
-          value: "3,200 sqm (0.320 Ha)",
-          confidence: 0.92,
-          top: "62%",
-          left: "14%",
-          width: "42%",
-          height: "7%",
-        },
-      ],
     };
   }
 
-  // Default: Punjab Jamabandi Record of Rights
   return {
     owner: "Ramesh Kumar",
     area: 1250,
@@ -199,49 +303,7 @@ export async function extractOcr(
     khewat_no: "74/82",
     khatauni_no: "112",
     cadastral_survey_area: 1180,
-    area_discrepancy_sqm: 70, // 1250 in RoR vs 1180 in GIS survey
-    bounding_boxes: [
-      {
-        field: "khewat_no",
-        label: "Khewat / Khatauni",
-        value: "74/82 · 112",
-        confidence: 0.93,
-        top: "22%",
-        left: "14%",
-        width: "32%",
-        height: "6%",
-      },
-      {
-        field: "owner",
-        label: "Malik / Cultivator Name",
-        value: "Ramesh Kumar s/o Som Nath",
-        confidence: 0.91,
-        top: "36%",
-        left: "14%",
-        width: "56%",
-        height: "7%",
-      },
-      {
-        field: "survey_no",
-        label: "Khasra Number",
-        value: "142/3",
-        confidence: 0.88,
-        top: "52%",
-        left: "14%",
-        width: "28%",
-        height: "6%",
-      },
-      {
-        field: "area",
-        label: "Rakba (Extracted Area)",
-        value: "1,250 sqm (2 Kanals 9 Marlas)",
-        confidence: 0.89,
-        top: "67%",
-        left: "14%",
-        width: "46%",
-        height: "7%",
-      },
-    ],
+    area_discrepancy_sqm: 70,
   };
 }
 
@@ -257,7 +319,7 @@ export async function submitOcrVerification(payload: {
   timestamp: string;
   action_summary: string;
 }> {
-  await sleep(400);
+  await sleep(300);
   const fakeHash = Array.from({ length: 32 }, () =>
     Math.floor(Math.random() * 16).toString(16)
   ).join("");
@@ -268,59 +330,7 @@ export async function submitOcrVerification(payload: {
     timestamp: new Date().toISOString(),
     action_summary:
       payload.decision === "confirmed"
-        ? `RoR metadata for ${payload.ulpid} verified and integrated into cadastral register.`
-        : `Discrepancy flagged for ${payload.ulpid}: Dispatched to Officer Mutation Queue for ground survey inspection.`,
+        ? `RoR metadata for ${payload.ulpid} verified and synchronized.`
+        : `Discrepancy flagged for ${payload.ulpid}: Dispatched to Officer Mutation Queue.`,
   };
-}
-
-export async function getMapParcels(): Promise<GeoFeatureCollection> {
-  const live = await tryFetch<GeoFeatureCollection>(`/map/parcels`);
-  if (live) return live;
-  await sleep(150);
-  return MOCK_GEOJSON;
-}
-
-// ==========================================
-// Land Stack Geospatial Endpoints & Fallbacks
-// ==========================================
-
-export async function getPilotRegions(): Promise<PilotRegion[]> {
-  return PILOT_REGIONS;
-}
-
-export async function getMapParcelsByRegion(
-  regionId: RegionId
-): Promise<GeoFeatureCollection> {
-  const live = await tryFetch<GeoFeatureCollection>(
-    `/map/parcels?region=${regionId}`
-  );
-  if (live) return live;
-  await sleep(120);
-  return MOCK_REGIONAL_GEOJSON[regionId] ?? MOCK_GEOJSON;
-}
-
-export async function getEncroachmentAlerts(
-  regionId?: RegionId
-): Promise<EncroachmentAlert[]> {
-  const path = regionId
-    ? `/ai/encroachment-alerts?region=${regionId}`
-    : `/ai/encroachment-alerts`;
-  const live = await tryFetch<EncroachmentAlert[]>(path);
-  if (live) return live;
-  await sleep(100);
-  if (!regionId) return MOCK_ENCROACHMENT_ALERTS;
-  return MOCK_ENCROACHMENT_ALERTS.filter((a) => a.region_id === regionId);
-}
-
-export async function getUtilityLines(
-  regionId?: RegionId
-): Promise<UtilityLine[]> {
-  const path = regionId
-    ? `/map/utilities?region=${regionId}`
-    : `/map/utilities`;
-  const live = await tryFetch<UtilityLine[]>(path);
-  if (live) return live;
-  await sleep(100);
-  if (!regionId) return MOCK_UTILITIES;
-  return MOCK_UTILITIES.filter((u) => u.region_id === regionId);
 }

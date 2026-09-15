@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import {
   MapContainer,
   TileLayer,
@@ -29,23 +31,23 @@ import {
 } from "@/lib/types";
 
 // ==========================================
-// Color Palettes & Legend Constants
+// Color Palettes & Legend Constants (GovTech Theme)
 // ==========================================
 const LAND_USE_COLORS: Record<string, string> = {
-  Residential: "#C08A28", // Ochre
-  Agricultural: "#2F5233", // Land green
-  Commercial: "#14213D", // Ink
-  Industrial: "#B0432D", // Brick
-  "Restriction Zone": "#7C2D12", // Deep amber/brown
-  "Eco-Sensitive": "#047857", // Deep emerald
+  Residential: "#C08A28", // Ochre / Gold
+  Agricultural: "#2F5233", // Forest Land green
+  Commercial: "#14213D", // Ink Navy
+  Industrial: "#8A3828", // Terracotta
+  "Restriction Zone": "#7C2D12", // Deep Amber
+  "Eco-Sensitive": "#047857", // Deep Emerald
 };
 
 const ZONING_COLORS: Record<string, string> = {
   Residential: "#DDA84B",
   Commercial: "#233257",
-  Industrial: "#991B1B",
+  Industrial: "#8A3828",
   Agricultural: "#3E6B43",
-  "Restriction Zone": "#B91C1C", // Vivid crimson for restricted greenbelts
+  "Restriction Zone": "#B91C1C",
   "Eco-Sensitive": "#059669",
 };
 
@@ -56,27 +58,84 @@ const TAX_BAND_COLORS: Record<string, string> = {
 };
 
 const UTILITY_COLORS: Record<string, string> = {
-  power_grid: "#EAB308", // Electric yellow
-  water_main: "#0284C7", // Cyan water
-  stormwater_drain: "#0D9488", // Teal drainage
+  power_grid: "#D97706",
+  water_main: "#0284C7",
+  stormwater_drain: "#0D9488",
 };
 
 // ==========================================
-// Camera Pan Helper Component
+// Map Controller for Camera & Auto-Bounds
 // ==========================================
 function MapController({
-  center,
-  zoom,
+  parcelsGeo,
+  focusCoords,
+  fitTrigger,
+  demoFocusTrigger,
+  resetTrigger,
+  defaultCenter,
+  defaultZoom,
 }: {
-  center: [number, number] | null;
-  zoom: number;
+  parcelsGeo: GeoFeatureCollection | null;
+  focusCoords: [number, number] | null;
+  fitTrigger: number;
+  demoFocusTrigger: number;
+  resetTrigger: number;
+  defaultCenter: [number, number];
+  defaultZoom: number;
 }) {
   const map = useMap();
+
+  // 1. Auto-fit bounds on initial data load
   useEffect(() => {
-    if (center) {
-      map.flyTo(center, zoom, { duration: 1.2, easeLinearity: 0.25 });
+    if (parcelsGeo && parcelsGeo.features.length > 0) {
+      try {
+        const geoLayer = L.geoJSON(parcelsGeo as any);
+        const bounds = geoLayer.getBounds();
+        if (bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+        }
+      } catch {
+        map.setView(defaultCenter, defaultZoom);
+      }
     }
-  }, [center, zoom, map]);
+  }, [parcelsGeo, map, defaultCenter, defaultZoom]);
+
+  // 2. React to external focus prop
+  useEffect(() => {
+    if (focusCoords) {
+      map.flyTo(focusCoords, 16, { duration: 1.0 });
+    }
+  }, [focusCoords, map]);
+
+  // 3. Trigger "Fit All Parcels"
+  useEffect(() => {
+    if (fitTrigger > 0 && parcelsGeo && parcelsGeo.features.length > 0) {
+      try {
+        const geoLayer = L.geoJSON(parcelsGeo as any);
+        const bounds = geoLayer.getBounds();
+        if (bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+        }
+      } catch {
+        map.setView(defaultCenter, 15);
+      }
+    }
+  }, [fitTrigger, parcelsGeo, map, defaultCenter]);
+
+  // 4. Trigger "Focus Demo Parcel" (PB-LDH-0042 at [30.905, 75.855])
+  useEffect(() => {
+    if (demoFocusTrigger > 0) {
+      map.flyTo([30.905, 75.855], 16, { duration: 1.0 });
+    }
+  }, [demoFocusTrigger, map]);
+
+  // 5. Trigger "Reset View"
+  useEffect(() => {
+    if (resetTrigger > 0) {
+      map.flyTo(defaultCenter, defaultZoom, { duration: 1.0 });
+    }
+  }, [resetTrigger, map, defaultCenter, defaultZoom]);
+
   return null;
 }
 
@@ -85,16 +144,25 @@ function MapController({
 // ==========================================
 export default function MapView({
   focus,
+  onSelectParcel,
+  selectedUlpidProp,
 }: {
   focus?: [number, number] | null;
+  onSelectParcel?: (props: GeoFeatureProperties) => void;
+  selectedUlpidProp?: string;
 }) {
   const router = useRouter();
 
-  // Region State (Multi-State Jumper)
+  // Region State
   const [regions, setRegions] = useState<PilotRegion[]>([]);
   const [activeRegionId, setActiveRegionId] = useState<RegionId>("punjab");
   const [mapCenter, setMapCenter] = useState<[number, number]>([30.908, 75.855]);
   const [mapZoom, setMapZoom] = useState<number>(14);
+
+  // Trigger counters for map actions
+  const [fitTrigger, setFitTrigger] = useState<number>(0);
+  const [demoFocusTrigger, setDemoFocusTrigger] = useState<number>(0);
+  const [resetTrigger, setResetTrigger] = useState<number>(0);
 
   // Data State
   const [parcelsGeo, setParcelsGeo] = useState<GeoFeatureCollection | null>(null);
@@ -103,13 +171,13 @@ export default function MapView({
   const [selectedParcel, setSelectedParcel] = useState<GeoFeatureProperties | null>(null);
   const [selectedAlert, setSelectedAlert] = useState<EncroachmentAlert | null>(null);
 
-  // Layer Visibility Controls (Land Stack Framework)
+  // Layer Visibility Controls
   const [baseLayerType, setBaseLayerType] = useState<"osm" | "satellite">("osm");
   const [showUlpinBadges, setShowUlpinBadges] = useState<boolean>(true);
   const [colorMode, setColorMode] = useState<"land_use" | "zoning" | "tax_bands">("land_use");
-  const [showEncroachmentAlerts, setShowEncroachmentAlerts] = useState<boolean>(true);
+  const [showEncroachmentAlerts, setShowEncroachmentAlerts] = useState<boolean>(false);
   const [showUtilities, setShowUtilities] = useState<boolean>(false);
-  const [controlPanelOpen, setControlPanelOpen] = useState<boolean>(true);
+  const [controlPanelOpen, setControlPanelOpen] = useState<boolean>(false);
 
   // Load Regions Metadata
   useEffect(() => {
@@ -130,7 +198,16 @@ export default function MapView({
       setParcelsGeo(geo);
       setEncroachments(alerts);
       setUtilities(utilLines);
-      setSelectedParcel(null);
+
+      // Default highlight PB-LDH-0042 if in Punjab
+      if (activeRegionId === "punjab") {
+        const demoFeature = geo.features.find((f) => f.properties.ulpid === "PB-LDH-0042");
+        if (demoFeature) {
+          setSelectedParcel(demoFeature.properties);
+        }
+      } else if (geo.features.length > 0) {
+        setSelectedParcel(geo.features[0].properties);
+      }
       setSelectedAlert(null);
     });
     return () => {
@@ -146,6 +223,16 @@ export default function MapView({
     }
   }, [focus]);
 
+  // Sync selected ULPID prop if provided
+  useEffect(() => {
+    if (selectedUlpidProp && parcelsGeo) {
+      const feat = parcelsGeo.features.find((f) => f.properties.ulpid === selectedUlpidProp);
+      if (feat) {
+        setSelectedParcel(feat.properties);
+      }
+    }
+  }, [selectedUlpidProp, parcelsGeo]);
+
   // Handle Region Jumper Selection
   const handleRegionSwitch = (region: PilotRegion) => {
     setActiveRegionId(region.id);
@@ -153,12 +240,33 @@ export default function MapView({
     setMapZoom(region.zoom);
   };
 
-  // Dynamic GeoJSON Polygon Styler based on Land Stack layer selection
+  // Quick Action Handlers
+  const handleFocusDemoParcel = () => {
+    if (activeRegionId !== "punjab") {
+      setActiveRegionId("punjab");
+    }
+    const demoFeature = parcelsGeo?.features.find((f) => f.properties.ulpid === "PB-LDH-0042");
+    if (demoFeature) {
+      setSelectedParcel(demoFeature.properties);
+    }
+    setDemoFocusTrigger((prev) => prev + 1);
+  };
+
+  const handleFitAllParcels = () => {
+    setFitTrigger((prev) => prev + 1);
+  };
+
+  const handleResetView = () => {
+    setResetTrigger((prev) => prev + 1);
+  };
+
+  // Dynamic GeoJSON Polygon Styler
   const getParcelStyle = (feature?: Feature): PathOptions => {
     const props = feature?.properties as GeoFeatureProperties | undefined;
     if (!props) return { color: "#14213D", weight: 1.5 };
 
     const isSelected = selectedParcel?.ulpid === props.ulpid;
+    const isDemoParcel = props.ulpid === "PB-LDH-0042";
 
     let fillColor = "#14213D";
     if (colorMode === "land_use") {
@@ -167,7 +275,7 @@ export default function MapView({
       fillColor = (props.zoning && ZONING_COLORS[props.zoning]) || LAND_USE_COLORS[props.land_use] || "#14213D";
     } else if (colorMode === "tax_bands") {
       if (props.tax_arrears) {
-        fillColor = "#B0432D"; // Highlighting tax arrears in alert red
+        fillColor = "#8A3828";
       } else {
         fillColor = (props.tax_band && TAX_BAND_COLORS[props.tax_band]) || "#8F6518";
       }
@@ -175,27 +283,66 @@ export default function MapView({
 
     const isRestriction = props.zoning === "Restriction Zone" || props.zoning === "Eco-Sensitive";
 
+    // Demo parcel PB-LDH-0042 gets distinct amber border and subtle fill
+    if (isDemoParcel) {
+      return {
+        color: isSelected ? "#C08A28" : "#8F6518",
+        weight: isSelected ? 3.5 : 2.5,
+        fillColor: "#DDA84B",
+        fillOpacity: isSelected ? 0.5 : 0.35,
+        dashArray: isSelected ? undefined : "6 4",
+        className: "parcel-polygon",
+      };
+    }
+
     return {
-      color: isSelected ? "#FF0055" : isRestriction ? "#B91C1C" : fillColor,
+      color: isSelected ? "#14213D" : isRestriction ? "#B91C1C" : fillColor,
       weight: isSelected ? 3 : isRestriction ? 2.5 : 1.5,
-      dashArray: isRestriction ? "8 4" : "5 4",
+      dashArray: isRestriction ? "8 4" : undefined,
       fillColor,
-      fillOpacity: isSelected ? 0.6 : isRestriction ? 0.45 : baseLayerType === "satellite" ? 0.35 : 0.25,
+      fillOpacity: isSelected ? 0.55 : isRestriction ? 0.45 : baseLayerType === "satellite" ? 0.35 : 0.25,
       className: "parcel-polygon",
     };
   };
 
-  // Parcel Feature Interactions
+  // Parcel Feature Interactions & Popups
   const onEachParcel = (feature: Feature, layer: Layer) => {
     const props = feature.properties as GeoFeatureProperties;
+    const isDemoMismatch = props.ulpid === "PB-LDH-0042";
 
-    // Interactive Hover & Click Handler
+    // Rich Standard Parcel Popup
+    const popupHtml = `
+      <div style="font-family: system-ui, -apple-system, sans-serif; font-size: 12px; color: #14213D; min-width: 210px; padding: 2px;">
+        <div style="font-family: monospace; font-size: 11px; font-weight: bold; color: #C08A28; letter-spacing: 0.5px;">${props.ulpid}</div>
+        <div style="font-size: 14px; font-weight: 700; margin-top: 2px; color: #14213D;">${props.owner_name || (isDemoMismatch ? "Ramesh Kumar" : "Titleholder")}</div>
+        <div style="margin-top: 6px; font-size: 11px; color: #4A5568; line-height: 1.4;">
+          <div><strong>Area:</strong> ${props.area_sqm?.toLocaleString() || (isDemoMismatch ? "1,250" : "—")} sqm</div>
+          <div><strong>Land Use:</strong> ${props.land_use || "Residential"}</div>
+        </div>
+        ${
+          isDemoMismatch
+            ? `<div style="margin-top: 8px; padding: 6px 8px; background-color: #FEF3C7; border: 1px solid #F59E0B; border-radius: 4px; font-size: 11px;">
+                <div style="font-weight: 700; color: #92400E;">⚠ Potential Area Mismatch</div>
+                <div style="color: #78350F; margin-top: 2px;">RoR: 1,250 sqm | Survey: 1,180 sqm</div>
+              </div>`
+            : ""
+        }
+        <div style="margin-top: 10px;">
+          <a href="/citizen/parcel/${props.ulpid}" style="display: block; text-align: center; background-color: #14213D; color: #EFEEE4; padding: 6px 10px; border-radius: 4px; text-decoration: none; font-weight: 600; font-size: 11px;">
+            Open Full Parcel Record →
+          </a>
+        </div>
+      </div>
+    `;
+
+    layer.bindPopup(popupHtml, { maxWidth: 280 });
+
     layer.on({
       mouseover: (e) => {
         const target = e.target;
         target.setStyle({
           fillOpacity: 0.55,
-          weight: 2.5,
+          weight: 3,
         });
       },
       mouseout: (e) => {
@@ -203,13 +350,14 @@ export default function MapView({
         if (selectedParcel?.ulpid !== props.ulpid) {
           target.setStyle({
             fillOpacity: baseLayerType === "satellite" ? 0.35 : 0.25,
-            weight: 1.5,
+            weight: props.ulpid === "PB-LDH-0042" ? 2.5 : 1.5,
           });
         }
       },
       click: () => {
         setSelectedParcel(props);
         setSelectedAlert(null);
+        onSelectParcel?.(props);
       },
     });
   };
@@ -223,70 +371,98 @@ export default function MapView({
   return (
     <div className="relative h-full w-full overflow-hidden font-sans">
       {/* =================================================================== */}
-      {/* TOP-LEFT: Multi-State Region Jumper (Land Stack Framework) */}
+      {/* TOP-LEFT: Quick Action Bar & Multi-State Region Jumper              */}
       {/* =================================================================== */}
-      <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-1.5 rounded-sm bg-parchment/95 p-1.5 plot-border-solid shadow-[4px_4px_0_rgba(20,33,61,0.18)] backdrop-blur">
-        <div className="flex items-center gap-1.5 px-2.5 pt-1 text-[10px] font-mono uppercase tracking-wider text-ink/60">
-          <span className="h-2 w-2 rounded-full bg-land animate-pulse" />
-          <span>Multi-State Pilot Jumper</span>
+      <div className="absolute top-3 left-3 z-[1000] flex flex-col gap-1.5 max-w-sm sm:max-w-md">
+        {/* Quick Map Controls */}
+        <div className="flex flex-wrap items-center gap-1.5 rounded-sm bg-parchment/95 p-1.5 plot-border-solid shadow-sm backdrop-blur">
+          <button
+            onClick={handleFocusDemoParcel}
+            className="flex items-center gap-1.5 rounded bg-ochre/20 hover:bg-ochre/30 border border-ochre/40 px-2.5 py-1 text-xs font-bold text-ochre-dark transition-all"
+            title="Center and highlight demo parcel PB-LDH-0042 (Ludhiana)"
+          >
+            <span>🎯 Focus Demo Parcel</span>
+          </button>
+          <button
+            onClick={handleFitAllParcels}
+            className="flex items-center gap-1 rounded bg-ink/5 hover:bg-ink/10 px-2.5 py-1 text-xs font-semibold text-ink transition-all"
+            title="Fit all parcels in view"
+          >
+            <span>⛶ Fit All Parcels</span>
+          </button>
+          <button
+            onClick={handleResetView}
+            className="flex items-center gap-1 rounded bg-ink/5 hover:bg-ink/10 px-2 py-1 text-xs font-medium text-ink/70 transition-all"
+            title="Reset map camera"
+          >
+            <span>↺ Reset View</span>
+          </button>
         </div>
-        <div className="flex flex-wrap gap-1">
-          {regions.map((reg) => {
-            const isActive = reg.id === activeRegionId;
-            return (
-              <button
-                key={reg.id}
-                onClick={() => handleRegionSwitch(reg)}
-                className={`flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium transition-all ${
-                  isActive
-                    ? "bg-ink text-parchment shadow-sm"
-                    : "bg-parchment-dark/60 text-ink/75 hover:bg-ink/10 hover:text-ink"
-                }`}
-              >
-                <span className="font-mono text-[11px] opacity-70">
-                  {reg.id === "punjab" ? "📍 PB" : reg.id === "chandigarh" ? "📍 CH" : "📍 TN"}
-                </span>
-                <span>{reg.name}</span>
-              </button>
-            );
-          })}
-        </div>
-        {currentRegion && (
-          <div className="px-2 pb-1 text-[11px] text-ink/60 max-w-xs truncate">
-            {currentRegion.description}
+
+        {/* Region Jumper */}
+        <div className="flex flex-col gap-1 rounded-sm bg-parchment/95 p-1.5 plot-border-solid shadow-sm backdrop-blur">
+          <div className="flex items-center justify-between px-2 pt-0.5 text-[10px] font-mono uppercase tracking-wider text-ink/60">
+            <div className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-land animate-pulse" />
+              <span>Pilot Region:</span>
+            </div>
+            <span className="text-[10px] text-ochre-dark font-semibold">
+              {activeRegionId === "punjab" ? "Ludhiana (Demo)" : activeRegionId}
+            </span>
           </div>
-        )}
+          <div className="flex flex-wrap gap-1">
+            {regions.map((reg) => {
+              const isActive = reg.id === activeRegionId;
+              return (
+                <button
+                  key={reg.id}
+                  onClick={() => handleRegionSwitch(reg)}
+                  className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-all ${
+                    isActive
+                      ? "bg-ink text-parchment shadow-sm"
+                      : "bg-parchment-dark/60 text-ink/75 hover:bg-ink/10 hover:text-ink"
+                  }`}
+                >
+                  <span className="font-mono text-[10px] opacity-70">
+                    {reg.id === "punjab" ? "📍 PB" : reg.id === "chandigarh" ? "📍 CH" : "📍 TN"}
+                  </span>
+                  <span>{reg.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* =================================================================== */}
-      {/* TOP-RIGHT: Land Stack 3-Tier Layer Controls */}
+      {/* TOP-RIGHT: Compact Layer Controls                                   */}
       {/* =================================================================== */}
-      <div className="absolute top-4 right-4 z-[1000] flex flex-col items-end">
+      <div className="absolute top-3 right-3 z-[1000] flex flex-col items-end">
         <button
           onClick={() => setControlPanelOpen(!controlPanelOpen)}
-          className="flex items-center gap-2 rounded-sm bg-parchment/95 px-3 py-1.5 text-xs font-medium text-ink plot-border-solid shadow-[3px_3px_0_rgba(20,33,61,0.18)] backdrop-blur hover:bg-parchment"
+          className="flex items-center gap-2 rounded-sm bg-parchment/95 px-3 py-1.5 text-xs font-medium text-ink plot-border-solid shadow-sm backdrop-blur hover:bg-parchment"
         >
           <span className="font-mono text-ochre-dark">❖</span>
-          <span>{controlPanelOpen ? "Hide Layers" : "Layer Controls"}</span>
+          <span>{controlPanelOpen ? "Hide Controls" : "Map Layers"}</span>
         </button>
 
         {controlPanelOpen && (
-          <div className="mt-2 w-72 rounded-sm bg-parchment/95 p-3.5 plot-border-solid shadow-[5px_5px_0_rgba(20,33,61,0.22)] backdrop-blur max-h-[calc(100vh-140px)] overflow-y-auto">
-            <div className="border-b border-ink/15 pb-2">
-              <span className="font-serif text-sm font-semibold text-ink">
-                Geospatial Layers
+          <div className="mt-2 w-64 sm:w-72 rounded-sm bg-parchment/95 p-3 plot-border-solid shadow-md backdrop-blur max-h-[calc(100vh-140px)] overflow-y-auto">
+            <div className="border-b border-ink/15 pb-1.5">
+              <span className="font-serif text-xs font-bold text-ink">
+                Geospatial Cadastral Layers
               </span>
               <p className="text-[10px] text-ink/60">
-                Land Stack 3-Tier Architecture
+                PostGIS SRID 4326 Layer Controls
               </p>
             </div>
 
             {/* 1. Base Imagery Toggle */}
-            <div className="mt-3">
-              <label className="block text-[11px] font-mono uppercase tracking-wider text-ink/60">
-                1. Base Imagery Layer
+            <div className="mt-2.5">
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-ink/60">
+                1. Base Map Layer
               </label>
-              <div className="mt-1.5 grid grid-cols-2 gap-1 rounded bg-ink/5 p-1">
+              <div className="mt-1 grid grid-cols-2 gap-1 rounded bg-ink/5 p-1">
                 <button
                   onClick={() => setBaseLayerType("osm")}
                   className={`rounded py-1 text-xs font-medium transition ${
@@ -295,7 +471,7 @@ export default function MapView({
                       : "text-ink/70 hover:text-ink"
                   }`}
                 >
-                  🗺️ Cadastral Map
+                  🗺️ Cadastral
                 </button>
                 <button
                   onClick={() => setBaseLayerType("satellite")}
@@ -305,16 +481,16 @@ export default function MapView({
                       : "text-ink/70 hover:text-ink"
                   }`}
                 >
-                  🛰️ Satellite High-Res
+                  🛰️ Satellite
                 </button>
               </div>
             </div>
 
             {/* 2. Base Cadastral Options */}
-            <div className="mt-3 border-t border-ink/10 pt-2.5">
+            <div className="mt-2.5 border-t border-ink/10 pt-2">
               <label className="flex items-center justify-between text-xs text-ink cursor-pointer">
                 <span className="flex items-center gap-1.5 font-medium">
-                  <span className="font-mono text-xs text-ochre">#</span> ULPIN Badges
+                  <span className="font-mono text-xs text-ochre">#</span> ULPID Badges
                 </span>
                 <input
                   type="checkbox"
@@ -326,15 +502,15 @@ export default function MapView({
             </div>
 
             {/* 3. Essential Layer: Zoning / Classification State */}
-            <div className="mt-3 border-t border-ink/10 pt-2.5">
-              <label className="block text-[11px] font-mono uppercase tracking-wider text-ink/60">
-                2. Essential Zoning Layer
+            <div className="mt-2.5 border-t border-ink/10 pt-2">
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-ink/60">
+                2. Land Classification
               </label>
-              <div className="mt-1.5 flex flex-col gap-1">
+              <div className="mt-1 flex flex-col gap-1">
                 {[
                   ["land_use", "Land Use Classification"],
-                  ["zoning", "Statutory Zoning & Restrictions"],
-                  ["tax_bands", "Tax Valuation & Arrears Bands"],
+                  ["zoning", "Statutory Zoning"],
+                  ["tax_bands", "Tax Valuation Bands"],
                 ].map(([modeKey, label]) => (
                   <button
                     key={modeKey}
@@ -354,32 +530,29 @@ export default function MapView({
               </div>
             </div>
 
-            {/* 4. AI/ML Change Detection Overlay */}
-            <div className="mt-3 border-t border-ink/10 pt-2.5">
-              <div className="rounded border border-[#FF0055]/30 bg-[#FF0055]/5 p-2">
+            {/* 4. AI/ML Change Detection Overlay (Honest Prototype Label) */}
+            <div className="mt-2.5 border-t border-ink/10 pt-2">
+              <div className="rounded border border-ochre/30 bg-ochre/5 p-2">
                 <label className="flex items-center justify-between text-xs text-ink cursor-pointer">
-                  <span className="flex items-center gap-1.5 font-medium text-[#B91C1C]">
-                    <span className="relative flex h-2 w-2">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#FF0055] opacity-75" />
-                      <span className="relative inline-flex h-2 w-2 rounded-full bg-[#FF0055]" />
-                    </span>
-                    AI Encroachment Alerts
+                  <span className="flex items-center gap-1.5 font-medium text-ochre-dark">
+                    <span>🛰️</span>
+                    AI Change Detection
                   </span>
                   <input
                     type="checkbox"
                     checked={showEncroachmentAlerts}
                     onChange={(e) => setShowEncroachmentAlerts(e.target.checked)}
-                    className="accent-[#FF0055] cursor-pointer"
+                    className="accent-ochre cursor-pointer"
                   />
                 </label>
                 <div className="mt-1 text-[10px] text-ink/60">
-                  {encroachments.length} satellite change detections active in region
+                  <span className="font-semibold text-ochre-dark font-mono">[Planned — Stage 4]</span> Prototype capability for satellite NDVI/SAR anomaly detection.
                 </div>
               </div>
             </div>
 
-            {/* 5. Use-Case Layer: Utility Infrastructure */}
-            <div className="mt-3 border-t border-ink/10 pt-2.5">
+            {/* 5. Utility Infrastructure (Honest Prototype Label) */}
+            <div className="mt-2.5 border-t border-ink/10 pt-2">
               <label className="flex items-center justify-between text-xs text-ink cursor-pointer">
                 <span className="flex items-center gap-1.5 font-medium">
                   <span className="text-sm">⚡</span> Utility Infrastructure
@@ -392,7 +565,7 @@ export default function MapView({
                 />
               </label>
               <div className="mt-1 text-[10px] text-ink/50">
-                Power corridors, potable water mains &amp; drain canals
+                <span className="font-semibold text-ink/70 font-mono">[Planned — Stage 4]</span> Power corridors &amp; water mains
               </div>
             </div>
           </div>
@@ -400,193 +573,93 @@ export default function MapView({
       </div>
 
       {/* =================================================================== */}
-      {/* BOTTOM-LEFT: Selected Parcel or AI Alert Inspector Card */}
+      {/* BOTTOM-LEFT: Selected Parcel Inspector Card                         */}
       {/* =================================================================== */}
       {selectedParcel && (
-        <div className="absolute bottom-4 left-4 z-[1000] w-80 rounded-sm bg-parchment/95 p-4 plot-border-solid shadow-[5px_5px_0_rgba(20,33,61,0.22)] backdrop-blur">
-          <div className="flex items-start justify-between border-b border-ink/15 pb-2">
+        <div className="absolute bottom-3 left-3 z-[1000] w-72 sm:w-80 rounded-sm bg-parchment/95 p-3.5 plot-border-solid shadow-md backdrop-blur">
+          <div className="flex items-start justify-between border-b border-ink/15 pb-1.5">
             <div>
-              <span className="font-mono text-[11px] text-ink/50">
-                {selectedParcel.ulpid}
-              </span>
-              <h4 className="font-serif text-base font-semibold text-ink">
-                {selectedParcel.owner_name ?? "Parcel Record"}
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-[11px] font-bold text-ochre-dark">
+                  {selectedParcel.ulpid}
+                </span>
+                {selectedParcel.ulpid === "PB-LDH-0042" && (
+                  <span className="bg-ochre/20 text-ochre-dark text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">
+                    Demo Parcel
+                  </span>
+                )}
+              </div>
+              <h4 className="font-serif text-sm font-bold text-ink mt-0.5">
+                {selectedParcel.owner_name ?? (selectedParcel.ulpid === "PB-LDH-0042" ? "Ramesh Kumar" : "Landowner")}
               </h4>
             </div>
             <button
               onClick={() => setSelectedParcel(null)}
-              className="text-xs text-ink/50 hover:text-ink"
+              className="text-xs text-ink/50 hover:text-ink p-0.5"
             >
               ✕
             </button>
           </div>
 
-          <div className="mt-2.5 grid grid-cols-2 gap-2 text-xs">
+          <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
             <div>
-              <span className="text-[10px] text-ink/50 uppercase font-mono">Zoning</span>
+              <span className="text-[10px] text-ink/50 uppercase font-mono">Land Use</span>
               <div className="font-medium text-ink">
-                {selectedParcel.zoning ?? selectedParcel.land_use}
+                {selectedParcel.land_use ?? "Residential"}
               </div>
             </div>
             <div>
-              <span className="text-[10px] text-ink/50 uppercase font-mono">Area</span>
-              <div className="font-medium text-ink">
-                {selectedParcel.area_sqm?.toLocaleString() ?? "—"} sqm
-              </div>
-            </div>
-            <div>
-              <span className="text-[10px] text-ink/50 uppercase font-mono">Valuation</span>
-              <div className="font-medium text-ink">
-                {selectedParcel.tax_band ?? "Band B (Mid)"}
-              </div>
-            </div>
-            <div>
-              <span className="text-[10px] text-ink/50 uppercase font-mono">Tax Arrears</span>
-              <div
-                className={`font-medium ${
-                  selectedParcel.tax_arrears ? "text-brick font-semibold" : "text-land"
-                }`}
-              >
-                {selectedParcel.tax_arrears ? "Pending Dues" : "Zero Dues"}
+              <span className="text-[10px] text-ink/50 uppercase font-mono">Total Area</span>
+              <div className="font-serif font-bold text-ink">
+                {selectedParcel.area_sqm?.toLocaleString() ?? (selectedParcel.ulpid === "PB-LDH-0042" ? "1,250" : "—")} sqm
               </div>
             </div>
           </div>
 
-          {selectedParcel.zoning === "Restriction Zone" || selectedParcel.zoning === "Eco-Sensitive" ? (
-            <div className="mt-2.5 rounded bg-brick/10 p-2 text-[11px] text-brick border border-brick/30 font-medium">
-              ⚠️ Statutory Restriction Zone: Construction and commercial conversion strictly prohibited.
+          {/* Prominent Mismatch Box for Demo Parcel PB-LDH-0042 */}
+          {selectedParcel.ulpid === "PB-LDH-0042" && (
+            <div className="mt-2 rounded bg-amber-50 p-2 text-[11px] text-amber-900 border border-amber-300">
+              <div className="font-bold flex items-center gap-1 text-amber-800">
+                <span>⚠</span>
+                <span>Potential Area Mismatch</span>
+              </div>
+              <div className="mt-1 text-[10px] text-amber-900/80 font-mono">
+                RoR: 1,250 sqm · Survey: 1,180 sqm (Diff: 70 sqm)
+              </div>
             </div>
-          ) : null}
+          )}
 
-          <div className="mt-3 flex gap-2">
+          <div className="mt-2.5">
             <button
-              onClick={() => router.push(`/parcel/${selectedParcel.ulpid}`)}
+              onClick={() => router.push(`/citizen/parcel/${selectedParcel.ulpid}`)}
               className="w-full rounded-sm bg-ink px-3 py-1.5 text-center text-xs font-medium text-parchment hover:bg-ink-light transition"
             >
-              View Full Deed &amp; Mutation History →
-            </button>
-          </div>
-        </div>
-      )}
-
-      {selectedAlert && (
-        <div className="absolute bottom-4 left-4 z-[1000] w-84 rounded-sm bg-parchment/95 p-4 plot-border-solid shadow-[5px_5px_0_rgba(20,33,61,0.22)] backdrop-blur border-l-4 border-l-[#FF0055]">
-          <div className="flex items-start justify-between border-b border-ink/15 pb-2">
-            <div>
-              <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold text-[#FF0055]">
-                <span className="h-2 w-2 rounded-full bg-[#FF0055] animate-ping" />
-                <span>AI SATELLITE ENCROACHMENT ALERT</span>
-              </div>
-              <h4 className="font-serif text-sm font-semibold text-ink mt-0.5">
-                {selectedAlert.id} · {selectedAlert.ulpid}
-              </h4>
-            </div>
-            <button
-              onClick={() => setSelectedAlert(null)}
-              className="text-xs text-ink/50 hover:text-ink"
-            >
-              ✕
-            </button>
-          </div>
-
-          <p className="mt-2 text-xs text-ink/80 leading-relaxed">
-            {selectedAlert.description}
-          </p>
-
-          <div className="mt-2.5 grid grid-cols-2 gap-2 text-xs bg-[#FF0055]/5 p-2 rounded">
-            <div>
-              <span className="text-[10px] text-ink/50 uppercase font-mono">Encroached Area</span>
-              <div className="font-bold text-ink">{selectedAlert.area_sqm} sqm</div>
-            </div>
-            <div>
-              <span className="text-[10px] text-ink/50 uppercase font-mono">AI Model Confidence</span>
-              <div className="font-bold text-[#B91C1C]">
-                {(selectedAlert.confidence * 100).toFixed(0)}%
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-3 flex gap-2">
-            <button
-              onClick={() => router.push(`/parcel/${selectedAlert.ulpid}`)}
-              className="w-full rounded-sm bg-[#B91C1C] px-3 py-1.5 text-center text-xs font-medium text-parchment hover:bg-[#991B1B] transition"
-            >
-              Examine Affected Parcel →
+              Open Full Parcel Record →
             </button>
           </div>
         </div>
       )}
 
       {/* =================================================================== */}
-      {/* BOTTOM-RIGHT: Dynamic Legend */}
+      {/* BOTTOM-RIGHT: Compact Map Legend                                    */}
       {/* =================================================================== */}
-      <div className="absolute bottom-4 right-4 z-[1000] hidden sm:flex flex-col gap-1.5 rounded-sm bg-parchment/95 p-2.5 plot-border-solid shadow-[3px_3px_0_rgba(20,33,61,0.18)] backdrop-blur text-[11px]">
-        <div className="font-mono text-[10px] font-semibold text-ink/60 uppercase">
-          Active Layer: {colorMode.replace("_", " ")}
+      <div className="absolute bottom-3 right-3 z-[1000] hidden sm:flex flex-col gap-1 rounded-sm bg-parchment/95 p-2 plot-border-solid shadow-sm backdrop-blur text-[11px]">
+        <div className="font-mono text-[9px] font-semibold text-ink/60 uppercase">
+          Legend: {colorMode.replace("_", " ")}
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           {colorMode === "land_use" &&
             Object.entries(LAND_USE_COLORS).map(([label, color]) => (
-              <span key={label} className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: color }} />
+              <span key={label} className="flex items-center gap-1 text-[10px]">
+                <span className="h-2 w-2 rounded-sm" style={{ background: color }} />
                 <span>{label}</span>
               </span>
             ))}
-
-          {colorMode === "zoning" &&
-            Object.entries(ZONING_COLORS).map(([label, color]) => (
-              <span key={label} className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: color }} />
-                <span>{label}</span>
-              </span>
-            ))}
-
-          {colorMode === "tax_bands" && (
-            <>
-              {Object.entries(TAX_BAND_COLORS).map(([label, color]) => (
-                <span key={label} className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-sm" style={{ background: color }} />
-                  <span>{label}</span>
-                </span>
-              ))}
-              <span className="flex items-center gap-1.5 text-brick font-medium">
-                <span className="h-2.5 w-2.5 rounded-sm bg-[#B0432D]" />
-                <span>Tax Arrears Alert</span>
-              </span>
-            </>
-          )}
         </div>
-
-        {showEncroachmentAlerts && (
-          <div className="flex items-center gap-1.5 pt-1 border-t border-ink/10 text-[#B91C1C]">
-            <span className="h-2 w-2 rounded-full bg-[#FF0055] animate-ping" />
-            <span className="font-medium">Neon Box: AI Change Detection / Encroachment</span>
-          </div>
-        )}
-
-        {showUtilities && (
-          <div className="flex flex-col gap-1 pt-1 border-t border-ink/10">
-            <div className="flex items-center gap-3">
-              <span className="flex items-center gap-1 text-amber-600">
-                <span className="h-1 w-4 border-t-2 border-dashed border-yellow-500 inline-block" /> HT Power Corridor
-              </span>
-              <span className="flex items-center gap-1 text-sky-600">
-                <span className="h-1 w-4 bg-sky-600 inline-block" /> Water Main
-              </span>
-              <span className="flex items-center gap-1 text-teal-600">
-                <span className="h-1 w-4 bg-teal-600 inline-block" /> Storm Drain
-              </span>
-            </div>
-            <div className="flex items-center gap-1 text-amber-700 text-[10px]">
-              <span className="h-2.5 w-4 border border-dashed border-yellow-500 bg-yellow-400/20 inline-block rounded-sm" />
-              Statutory Safety Buffer Zone
-            </div>
-          </div>
-        )}
       </div>
 
       {/* =================================================================== */}
-      {/* LEAFLET MAP CONTAINER */}
+      {/* LEAFLET MAP CONTAINER                                               */}
       {/* =================================================================== */}
       <MapContainer
         center={mapCenter}
@@ -600,18 +673,18 @@ export default function MapView({
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            opacity={0.6}
+            opacity={0.65}
           />
         ) : (
           <TileLayer
-            attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+            attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS'
             url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
             maxZoom={19}
             opacity={0.85}
           />
         )}
 
-        {/* Layer 2: Cadastral GeoJSON Parcels */}
+        {/* Layer 2: Cadastral GeoJSON Parcels (Source of Truth) */}
         {parcelsGeo && (
           <GeoJSON
             key={`${activeRegionId}-${colorMode}-${baseLayerType}-${selectedParcel?.ulpid ?? ""}`}
@@ -621,14 +694,10 @@ export default function MapView({
           />
         )}
 
-        {/* Layer 2b: Permanent/Hover ULPIN Badges */}
+        {/* Layer 2b: Permanent/Hover ULPID Badges */}
         {showUlpinBadges &&
           parcelsGeo?.features.map((f) => {
             const coords = f.geometry.coordinates[0];
-            // Center centroid calculation
-            const avgLat = (coords[0][1] + coords[2][1]) / 2;
-            const avgLng = (coords[0][0] + coords[2][0]) / 2;
-
             return (
               <Polygon
                 key={`ulpin-${f.properties.ulpid}`}
@@ -646,7 +715,7 @@ export default function MapView({
             );
           })}
 
-        {/* Layer 2c: AI/ML Change Detection Encroachment Overlays */}
+        {/* Layer 2c: Encroachment Overlays (Prototype / Planned) */}
         {showEncroachmentAlerts &&
           encroachments.map((alert) => {
             const polygonCoords = alert.coordinates[0].map(([lng, lat]) => [lat, lng] as [number, number]);
@@ -657,12 +726,11 @@ export default function MapView({
                 key={alert.id}
                 positions={polygonCoords}
                 pathOptions={{
-                  color: "#FF0055",
-                  weight: isSelected ? 3.5 : 2.5,
-                  fillColor: "#FF0055",
-                  fillOpacity: isSelected ? 0.45 : 0.28,
+                  color: "#B45309",
+                  weight: isSelected ? 3 : 2,
+                  fillColor: "#F59E0B",
+                  fillOpacity: isSelected ? 0.45 : 0.25,
                   dashArray: "4 3",
-                  className: "neon-encroachment-alert",
                 }}
                 eventHandlers={{
                   click: () => {
@@ -673,7 +741,7 @@ export default function MapView({
               >
                 <Tooltip direction="top" offset={[0, -10]} opacity={0.95}>
                   <div className="font-sans text-xs">
-                    <div className="font-bold text-[#FF0055]">⚠️ AI Encroachment Alert</div>
+                    <div className="font-bold text-amber-800">⚠️ Change Detection Alert (Stage 4)</div>
                     <div className="font-mono text-[10px] text-ink/70">{alert.id} · {alert.area_sqm} sqm</div>
                   </div>
                 </Tooltip>
@@ -681,68 +749,38 @@ export default function MapView({
             );
           })}
 
-        {/* Layer 3a: Power Corridor Safety Buffer Zones (Statutory Clearance Polygons) */}
-        {showUtilities &&
-          utilities
-            .filter((line) => line.type === "power_grid" && line.buffer_polygon && line.buffer_polygon.length > 0)
-            .map((line) => (
-              <Polygon
-                key={`buf-${line.id}`}
-                positions={line.buffer_polygon!}
-                pathOptions={{
-                  color: "#EAB308",
-                  weight: 1.5,
-                  dashArray: "6 4",
-                  fillColor: "#EAB308",
-                  fillOpacity: 0.10,
-                  opacity: 0.55,
-                  className: "power-buffer-corridor",
-                }}
-              >
-                <Tooltip direction="center" sticky opacity={0.95}>
-                  <div className="font-sans text-xs">
-                    <div className="font-bold text-amber-700">⚡ Statutory Safety Buffer</div>
-                    <div className="font-mono text-[10px] text-ink/70">
-                      {line.safety_buffer_meters}m No-Build Clearance Zone
-                    </div>
-                    <div className="text-[10px] text-ink/60">{line.name}</div>
-                  </div>
-                </Tooltip>
-              </Polygon>
-            ))}
-
-        {/* Layer 3b: Utility Infrastructure Lines (Polyline overlays) */}
+        {/* Layer 3: Utility Infrastructure Lines */}
         {showUtilities &&
           utilities.map((line) => (
             <Polyline
               key={line.id}
               positions={line.coordinates}
               pathOptions={{
-                color: UTILITY_COLORS[line.type] || "#EAB308",
-                weight: line.type === "power_grid" ? 4 : 3,
-                dashArray: line.type === "power_grid" ? "8 5" : undefined,
-                opacity: 0.95,
+                color: UTILITY_COLORS[line.type] || "#D97706",
+                weight: 3,
+                dashArray: line.type === "power_grid" ? "6 4" : undefined,
+                opacity: 0.9,
               }}
             >
               <Tooltip direction="top" opacity={0.95}>
                 <div className="font-sans text-xs">
-                  <div className="font-semibold text-ink">{line.name}</div>
+                  <div className="font-semibold text-ink">{line.name} [Planned]</div>
                   <div className="font-mono text-[10px] text-ink/60">{line.specification}</div>
-                  {line.voltage_or_flow && (
-                    <div className="font-mono text-[10px] text-ink/50">Flow: {line.voltage_or_flow}</div>
-                  )}
-                  {line.safety_buffer_meters && (
-                    <div className="text-[10px] text-amber-700 font-medium">
-                      ⚠️ {line.safety_buffer_meters}m statutory clearance zone
-                    </div>
-                  )}
                 </div>
               </Tooltip>
             </Polyline>
           ))}
 
-        {/* Controller to animate view changes */}
-        <MapController center={mapCenter} zoom={mapZoom} />
+        {/* Controller for Camera Animations & Auto-fitBounds */}
+        <MapController
+          parcelsGeo={parcelsGeo}
+          focusCoords={focus ?? null}
+          fitTrigger={fitTrigger}
+          demoFocusTrigger={demoFocusTrigger}
+          resetTrigger={resetTrigger}
+          defaultCenter={currentRegion?.center ?? [30.908, 75.855]}
+          defaultZoom={currentRegion?.zoom ?? 14}
+        />
       </MapContainer>
     </div>
   );
