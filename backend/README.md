@@ -136,7 +136,7 @@ The backend includes a migration engine that tracks schema versions in `schema_m
 
 ## 🧪 Running Tests
 
-- **Run full test suite (11 test suites / 38 unit & integration tests):**
+- **Run full test suite (12 test suites / 39 unit & integration tests):**
   ```bash
   npm test
   ```
@@ -297,3 +297,19 @@ Base URL: `http://localhost:5000/api`
 - **Indexing**: Spatial GiST index `idx_parcels_geometry` is applied for sub-millisecond bounding box and intersection queries.
 - **Centroid Queries**: Centroids for parcel searches are computed in PostGIS using `ROUND(ST_Y(ST_Centroid(geometry))::numeric, 4)` and `ROUND(ST_X(ST_Centroid(geometry))::numeric, 4)`.
 - **Tamper-Evident Audit Trail**: Mutation decisions calculate a SHA-256 hash chained to the previous mutation record for that parcel, ensuring cryptographic immutability without blockchain overhead.
+
+---
+
+## 🗺️ GIS Integration & Boundaries
+
+| Responsibility Area | Owner | Details |
+| :--- | :--- | :--- |
+| **API & Persistence** | Backend | Exposes `/api/map/parcels`, `/api/parcel/:ulpid`, PostGIS table storage, GeoJSON serialization, RoR-vs-survey area mismatch checks, SHA-256 audit logs. |
+| **Spatial Processing** | GIS Teammate | Vectorization, QGIS workflows, GeoServer layer publishing, advanced spatial overlap / boundary encroachment analysis, cadastral shapefile ingestion. |
+
+### Integration Standards
+1. **Common Integration Key**: `ulpid` (Unique Land Parcel Identification Number) serves as the primary identifier across Backend, GIS layers, and Land Records.
+2. **Geometry Standard**: PostGIS `GEOMETRY(Polygon, 4326)` (WGS 84, standard GeoJSON `[longitude, latitude]` coordinate order).
+3. **GeoJSON Exposure**: `GET /api/map/parcels` returns standard GeoJSON `FeatureCollection` with `properties: { ulpid, land_use }` for direct frontend/GIS client consumption.
+4. **Backend Abstraction**: `GisService` in `src/gis/` provides clean bounding box (`calculateBBox`) utilities and integration types (`SpatialConflictResult`) without duplicating GIS spatial processing algorithms.
+
