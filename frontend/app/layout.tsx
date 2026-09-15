@@ -23,10 +23,12 @@ const plexMono = IBM_Plex_Mono({
   display: "swap",
 });
 
+import { AuthProvider } from "@/lib/authContext";
+
 export const metadata: Metadata = {
-  title: "Bhu-Setu | Unified Land Record Portal",
+  title: "Bhu-Setu | Unified Land Record Portal & GIS Infrastructure",
   description:
-    "GIS-based Digital Public Infrastructure for Land Governance — SIH 26014",
+    "Integrated GIS-based Digital Public Infrastructure for Land Governance — SIH 2026",
 };
 
 export default function RootLayout({
@@ -39,8 +41,9 @@ export default function RootLayout({
       <body
         className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable} font-sans antialiased`}
       >
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );
 }
+

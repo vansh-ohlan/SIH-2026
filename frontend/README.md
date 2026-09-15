@@ -1,73 +1,94 @@
-# Bhu-Setu — Frontend
+# Bhu-Setu — Frontend Prototype (SIH 2026)
 
-Citizen portal + officer dashboard for **SIH 26014**, built against
-`api_contracts.md`. Next.js 14 (App Router) + TypeScript + Tailwind + Leaflet.
+The frontend application for **Bhu-Setu** (Smart India Hackathon 2026 — Problem Statement 26014): **An Integrated GIS-based Digital Public Infrastructure for Land Governance**.
 
-## Run it
+Built with **Next.js 14 (App Router)**, **TypeScript**, **Tailwind CSS**, and **Leaflet (React-Leaflet)**.
 
-```bash
-npm install
-npm run dev
-```
+---
 
-Open http://localhost:3000.
+## 🚀 Quick Start
 
-By default the app calls `http://localhost:5000/api` (Backend's stub
-server). If that's unreachable it **silently falls back to mock data** in
-`lib/mockData.ts`, so the app is fully demoable before Backend is up, and
-nothing changes on your end once it is — see `lib/api.ts`.
+1. **Install dependencies:**
+   ```bash
+   cd frontend
+   npm install
+   ```
 
-To point at a different backend host/port, copy `.env.local.example` to
-`.env.local` and edit `NEXT_PUBLIC_API_BASE`.
+2. **Configure environment:**
+   ```bash
+   cp .env.example .env.local
+   ```
+   *(Default points to `http://localhost:5000/api`)*
 
-## Structure
+3. **Start development server:**
+   ```bash
+   npm run dev
+   ```
+   Open [http://localhost:3000](http://localhost:3000).
 
-```
-app/
-  page.tsx                 Citizen portal — hero, search, cadastral map
-  parcel/[ulpid]/page.tsx  Full parcel record (owner, tax, mutations, conflicts)
-  officer/page.tsx         Officer dashboard shell
-  layout.tsx, globals.css  Fonts + design tokens
+4. **Production Build & Lint:**
+   ```bash
+   npm run lint
+   npm run build
+   ```
 
-components/
-  Navbar.tsx           Shared nav
-  SearchBar.tsx         Debounced search against /parcel/search
-  MapView.tsx           Leaflet + GeoJSON, colored by land_use, click-to-open
-  ConflictBadge.tsx     low/medium/high badge (exact set from the contract)
-  MutationQueue.tsx     Officer's conflict queue + approve/reject/needs_review drawer
+---
 
-lib/
-  api.ts        One function per contract endpoint. Tries the real API,
-                falls back to mock data on failure/timeout.
-  mockData.ts   Hardcoded data matching every example in api_contracts.md,
-                expanded to 4 parcels so the map/search/queue aren't empty.
-  types.ts      TypeScript types mirroring the contract shapes exactly.
-```
+## 🧭 Application Routes
 
-## Endpoints wired up (see `lib/api.ts`)
+| Route | Page Purpose | Description |
+| :--- | :--- | :--- |
+| `/` | **Landing Page** | GovTech hero, non-disruptive integration process flow, CTA buttons, and featured parcel previews. |
+| `/citizen` | **Citizen Portal** | Public parcel lookup by ULPID/name, quick filter chips, and embedded cadastral survey map preview. |
+| `/citizen/search` | **Search Results** | Live parcel search result grid with direct link to cadastral records. |
+| `/citizen/parcel/:ulpid` | **Parcel Details** | Spatial specs, titleholders, tax status, mutation history, RoR vs GIS area comparison, and PostGIS preview. |
+| `/map` | **GIS Map Explorer** | Full-screen interactive Leaflet map rendering GeoJSON parcel polygons (`/api/map/parcels`) with region selectors and layer controls. |
+| `/officer` | **Officer Dashboard** | Governance hub with metrics, priority inconsistency queue featuring `PB-LDH-0042`, and mutation activity stream. |
+| `/officer/conflicts` | **Conflict Matrix** | Filterable list of technical inconsistencies between RoR land records and cadastral ground surveys. |
+| `/officer/mutations` | **Mutation Workflow** | Statutory adjudication interface (Approve, Reject, Needs Review) with SHA-256 cryptographic audit receipt. |
+| `/login` | **Demo Role Switcher** | Prototype authentication interface for switching between Citizen, Revenue Officer, Sub-Registrar, and Admin roles. |
 
-| Function | Contract route |
-|---|---|
-| `getParcel(ulpid)` | `GET /parcel/{ulpid}` |
-| `searchParcels(q)` | `GET /parcel/search?q=` |
-| `getConflicts(ulpid)` | `GET /parcel/{ulpid}/conflicts` |
-| `postMutationDecision(ulpid, body)` | `POST /mutation/{ulpid}` |
-| `extractOcr(file)` | `POST /ocr/extract` |
-| `getMapParcels()` | `GET /map/parcels` |
+---
 
-## Design notes
+## 🔐 Authentication & RBAC
 
-Cartographic theme — dashed "plot boundary" borders instead of card
-shadows, a coordinate-tick ruler motif, and a survey-stamp mark — built to
-read as an official land-record system rather than a generic dashboard
-template. Colors and type are defined as Tailwind tokens in
-`tailwind.config.ts` (`ink`, `parchment`, `ochre`, `land`, `brick`).
+The prototype uses JWT Bearer authentication connected to the backend development endpoint:
+- **Authentication**: `Authorization: Bearer <token>`
+- **Token Generation**: Calls `POST /api/auth/dev-token` with `{ "role": "<role>" }`.
+- **Role Permissions**:
+  - `citizen`: Read-only access to parcel records, search, and GIS maps. Cannot submit mutation decisions (403 Forbidden).
+  - `revenue_officer`: Full access to review conflict queues and execute mutation determinations with SHA-256 audit signing.
+  - `registrar`: Sub-Registrar deed verification and mutation approvals.
+  - `admin`: Full system configuration and administrative override.
 
-## Known gaps / next steps
+---
 
-- `extractOcr` in `lib/api.ts` is wired but not yet called from any page —
-  hook it up to an "Digitize record" upload button on the officer
-  dashboard if ML's pipeline is ready before judging.
-- No auth beyond the dummy bearer token the contract specifies for Phase 1–3.
-- Map tiles are OpenStreetMap (free, keyless). Swap to Mapbox GL only if you
-  want custom styling and have a token — not required.
+## 🗺️ GIS & Backend Integration
+
+- **Backend Base URL**: `http://localhost:5000/api`
+- **Parcel API**: `GET /api/parcel/{ulpid}`
+- **Search API**: `GET /api/parcel/search?q={query}`
+- **Conflicts API**: `GET /api/parcel/{ulpid}/conflicts`
+- **Mutation API**: `POST /api/mutation/{ulpid}` *(Protected by RBAC)*
+- **Map GeoJSON API**: `GET /api/map/parcels`
+- **Auth Dev Token API**: `POST /api/auth/dev-token`
+- **Auth Profile API**: `GET /api/auth/me`
+
+> **Offline Demonstration Fallback**: If the backend service is offline, the frontend seamlessly falls back to high-fidelity synthetic mock data (`lib/mockData.ts`) while clearly displaying the *"Demo Dataset"* indicator.
+
+---
+
+## 🎯 12-Step Demo User Journey
+
+1. **Open Landing Page** (`/`): View the Bhu-Setu DPI architecture and process flow.
+2. **Open Citizen Portal** (`/citizen`): Access public land record lookup.
+3. **Search Parcel**: Search `PB-LDH-0042` or `Ramesh`.
+4. **Inspect Parcel Record** (`/citizen/parcel/PB-LDH-0042`): Review Ramesh Kumar's 1,250 sqm residential holding.
+5. **Inspect GIS Boundary**: View the PostGIS polygon geometry (EPSG:4326).
+6. **Inspect Conflicts Tab**: View the flagged **Area Mismatch** (RoR 1,250 sqm vs Cadastral Survey 1,180 sqm, 70 sqm difference).
+7. **Switch to Revenue Officer** (`/login`): Select Revenue Officer (`OFF-102`) to obtain an officer JWT.
+8. **Open Officer Hub** (`/officer`): Review the prioritized conflict queue.
+9. **Open Conflict Review** (`/officer/conflicts`): Inspect the comparative area analysis.
+10. **Open Mutation Adjudication** (`/officer/mutations?ulpid=PB-LDH-0042`): Review the prefilled case.
+11. **Submit Decision**: Select **Needs Review**, enter officer notes, and confirm.
+12. **Verify Cryptographic Receipt**: View the returned **SHA-256 Audit Hash** and timestamp sealed in the PostgreSQL ledger.
