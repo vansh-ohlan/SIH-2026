@@ -40,7 +40,7 @@ export interface LedgerReceipt {
   timestamp: string;
   signing_authority: string;
   jurisdiction: string;
-  verification_status: "verified_immutable" | "audit_pending";
+  verification_status: "verified_tamper_evident" | "verified_immutable" | "audit_pending";
 }
 
 export interface Parcel {

@@ -109,7 +109,7 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       },
     },
     ledger_receipt: {
-      certificate_id: "CERT-PB-2026-0042-IMMUTABLE",
+      certificate_id: "CERT-PB-2026-0042-AUDIT",
       block_number: 104829,
       block_hash: "9f3a7c1e84d2b0e9a1c5f3b7d8e2a4c6b8d0e2f4a6c8b0d2e4f6a8b0c2d4e6f8",
       previous_hash: "3b8d0e2f4a6c8b0d2e4f6a8b0c2d4e6f89f3a7c1e84d2b0e9a1c5f3b7d8e2a4c",
@@ -117,7 +117,7 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       timestamp: "2026-03-01T06:30:00.000Z",
       signing_authority: "Directorate of Land Records & Revenue · Government of Punjab",
       jurisdiction: "Ludhiana West Sub-Division, Punjab",
-      verification_status: "verified_immutable",
+      verification_status: "verified_tamper_evident",
     },
   },
   "PB-LDH-0043": {
@@ -230,7 +230,7 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       { date: "2023-05-30", type: "Mortgage", from: "Harpreet Kaur", to: "State Bank of India" },
     ],
     ledger_receipt: {
-      certificate_id: "CERT-PB-2026-0044-IMMUTABLE",
+      certificate_id: "CERT-PB-2026-0044-AUDIT",
       block_number: 104880,
       block_hash: "5f3b7d8e2a4c6b8d0e2f4a6c8b0d2e4f6a8b0c2d4e6f89f3a7c1e84d2b0e9a1c",
       previous_hash: "0e2f4a6c8b0d2e4f6a8b0c2d4e6f89f3a7c1e84d2b0e9a1c5f3b7d8e2a4c6b8d",
@@ -238,7 +238,7 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       timestamp: "2026-02-10T11:45:00.000Z",
       signing_authority: "Directorate of Land Records & Revenue · Government of Punjab",
       jurisdiction: "Ludhiana Central Commercial Registry, Punjab",
-      verification_status: "verified_immutable",
+      verification_status: "verified_tamper_evident",
     },
   },
   "PB-LDH-0045": {
@@ -265,7 +265,7 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       { date: "2020-09-11", type: "Sale", from: "State", to: "Amanjot Bros. Pvt. Ltd." },
     ],
     ledger_receipt: {
-      certificate_id: "CERT-PB-2026-0045-IMMUTABLE",
+      certificate_id: "CERT-PB-2026-0045-AUDIT",
       block_number: 104650,
       block_hash: "2e4f6a8b0c2d4e6f89f3a7c1e84d2b0e9a1c5f3b7d8e2a4c6b8d0e2f4a6c8b0d",
       previous_hash: "8d0e2f4a6c8b0d2e4f6a8b0c2d4e6f89f3a7c1e84d2b0e9a1c5f3b7d8e2a4c6b",
@@ -273,7 +273,7 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       timestamp: "2026-01-05T09:20:00.000Z",
       signing_authority: "Directorate of Land Records & Revenue · Government of Punjab",
       jurisdiction: "Focal Point Industrial Zone, Ludhiana, Punjab",
-      verification_status: "verified_immutable",
+      verification_status: "verified_tamper_evident",
     },
   },
 
@@ -339,7 +339,7 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       },
     },
     ledger_receipt: {
-      certificate_id: "CERT-CH-2026-1701-IMMUTABLE",
+      certificate_id: "CERT-CH-2026-1701-AUDIT",
       block_number: 89410,
       block_hash: "7d8e2a4c6b8d0e2f4a6c8b0d2e4f6a8b0c2d4e6f89f3a7c1e84d2b0e9a1c5f3b",
       previous_hash: "6c8b0d2e4f6a8b0c2d4e6f89f3a7c1e84d2b0e9a1c5f3b7d8e2a4c6b8d0e2f4a",
@@ -347,7 +347,7 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       timestamp: "2026-02-28T14:10:00.000Z",
       signing_authority: "Estate Office · Union Territory Administration, Chandigarh",
       jurisdiction: "Sector 17 Commercial Complex, Chandigarh (UT)",
-      verification_status: "verified_immutable",
+      verification_status: "verified_tamper_evident",
     },
   },
   "CH-SEC-1702": {
@@ -556,7 +556,7 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       },
     },
     ledger_receipt: {
-      certificate_id: "CERT-TN-2026-0812-IMMUTABLE",
+      certificate_id: "CERT-TN-2026-0812-AUDIT",
       block_number: 142095,
       block_hash: "4c6b8d0e2f4a6c8b0d2e4f6a8b0c2d4e6f89f3a7c1e84d2b0e9a1c5f3b7d8e2a",
       previous_hash: "f3a7c1e84d2b0e9a1c5f3b7d8e2a4c6b8d0e2f4a6c8b0d2e4f6a8b0c2d4e6f89",
@@ -564,7 +564,7 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       timestamp: "2026-02-14T09:30:00.000Z",
       signing_authority: "Department of Revenue and Disaster Management · Government of Tamil Nadu",
       jurisdiction: "Sriperumbudur Taluk, Kanchipuram District, Tamil Nadu",
-      verification_status: "verified_immutable",
+      verification_status: "verified_tamper_evident",
     },
   },
   "TN-SPR-0813": {
@@ -635,7 +635,7 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       timestamp: "1984-01-01T00:00:00.000Z",
       signing_authority: "Water Resources Department (PWD) · Government of Tamil Nadu",
       jurisdiction: "Sriperumbudur Lake Basin, Tamil Nadu",
-      verification_status: "verified_immutable",
+      verification_status: "verified_tamper_evident",
     },
   },
   "TN-SPR-0814": {
