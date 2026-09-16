@@ -15,13 +15,19 @@ import {
   LogIn,
   Search,
   User,
-  UserPlus
+  UserPlus,
+  Menu,
+  X,
+  ShieldCheck,
+  Building,
+  Server
 } from "lucide-react";
 
 export default function Navbar() {
   const pathname = usePathname();
   const { user, role, isAuthenticated, logout } = useAuth();
   const [isBackendLive, setIsBackendLive] = useState<boolean | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -33,33 +39,40 @@ export default function Navbar() {
     };
   }, []);
 
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
   const getNavLinks = () => {
     switch (role) {
       case "revenue_officer":
         return [
           { href: "/officer", label: "Officer Hub", icon: Compass },
-          { href: "/officer/conflicts", label: "Conflicts", icon: ShieldAlert },
+          { href: "/officer/conflicts", label: "Conflicts Queue", icon: ShieldAlert },
           { href: "/officer/mutations", label: "Mutations", icon: FileCheck2 },
-          { href: "/map", label: "GIS Map", icon: Layers },
+          { href: "/officer/risk", label: "Due-Diligence", icon: ShieldCheck },
+          { href: "/map", label: "GIS Cadastre", icon: Layers },
         ];
       case "registrar":
         return [
-          { href: "/registrar", label: "Registrar Portal", icon: Compass },
+          { href: "/registrar", label: "Registrar Portal", icon: Building },
           { href: "/officer/mutations", label: "Mutations", icon: FileCheck2 },
-          { href: "/map", label: "GIS Map", icon: Layers },
+          { href: "/map", label: "GIS Cadastre", icon: Layers },
         ];
       case "admin":
         return [
-          { href: "/admin", label: "Admin Console", icon: Compass },
+          { href: "/admin", label: "Admin Console", icon: Server },
           { href: "/officer", label: "Officer Hub", icon: Compass },
           { href: "/officer/conflicts", label: "Conflicts", icon: ShieldAlert },
-          { href: "/map", label: "GIS Map", icon: Layers },
+          { href: "/map", label: "GIS Cadastre", icon: Layers },
         ];
       case "citizen":
       default:
         return [
           { href: "/citizen", label: "Citizen Portal", icon: Search },
-          { href: "/map", label: "GIS Map", icon: Layers },
+          { href: "/citizen/search", label: "Registry Lookup", icon: Compass },
+          { href: "/map", label: "GIS Cadastre", icon: Layers },
         ];
     }
   };
@@ -67,49 +80,51 @@ export default function Navbar() {
   const navLinks = getNavLinks();
 
   const roleLabels: Record<string, { label: string; badgeClass: string }> = {
-    citizen: { label: "Citizen", badgeClass: "bg-ink/10 text-ink" },
-    revenue_officer: { label: "Revenue Officer", badgeClass: "bg-ochre/25 text-ochre-dark font-bold" },
-    registrar: { label: "Sub-Registrar", badgeClass: "bg-land/25 text-land font-bold" },
-    admin: { label: "Administrator", badgeClass: "bg-brick/25 text-brick font-bold" },
+    citizen: { label: "Citizen", badgeClass: "bg-ink/10 text-ink border border-ink/15" },
+    revenue_officer: { label: "Revenue Officer", badgeClass: "bg-ochre/20 text-ochre-dark border border-ochre/30 font-bold" },
+    registrar: { label: "Sub-Registrar", badgeClass: "bg-land/20 text-land border border-land/30 font-bold" },
+    admin: { label: "Administrator", badgeClass: "bg-brick/20 text-brick border border-brick/30 font-bold" },
   };
 
   const currentRoleInfo = roleLabels[role] || roleLabels.citizen;
 
   return (
-    <header className="sticky top-0 z-40 plot-border-solid border-t-0 border-l-0 border-r-0 bg-parchment/95 backdrop-blur shadow-sm">
-      {/* Top Global Status Bar */}
-      <div className="bg-ink text-parchment/80 text-[11px] px-4 sm:px-6 py-1 flex items-center justify-between font-mono">
-        <div className="flex items-center gap-2.5">
-          <span className="flex items-center gap-1.5">
+    <header className="sticky top-0 z-40 border-b border-ink/15 bg-parchment/95 backdrop-blur-md shadow-xs">
+      {/* Top Global DPI Information Strip */}
+      <div className="bg-ink text-parchment/80 text-[11px] px-4 sm:px-6 py-1.5 flex items-center justify-between font-mono">
+        <div className="flex items-center gap-2.5 overflow-hidden">
+          <span className="flex items-center gap-1.5 shrink-0">
             <span className="inline-block w-2 h-2 rounded-full bg-ochre animate-pulse" />
-            <span className="font-semibold text-parchment">Bhu-Setu</span>
+            <span className="font-semibold text-parchment tracking-wide">BHU-SETU</span>
           </span>
-          <span className="hidden sm:inline text-parchment/30">|</span>
-          <span className="flex items-center gap-1.5">
+          <span className="text-parchment/30 shrink-0">|</span>
+          <span className="truncate text-parchment/90 hidden sm:inline text-[11px]">
+            Unified Land Information • Spatial Verification • Transparent Governance
+          </span>
+          <span className="truncate text-parchment/90 sm:hidden text-[10px]">
+            Land Governance Platform
+          </span>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
+          <span className="flex items-center gap-1.5 text-[10px]">
             {isBackendLive === true ? (
-              <>
-                <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />
-                <span className="text-emerald-300 font-semibold">PostGIS Engine Active</span>
-              </>
+              <span className="flex items-center gap-1 text-emerald-300 font-medium">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span className="hidden md:inline">PostGIS Live</span>
+              </span>
             ) : isBackendLive === false ? (
-              <>
-                <span className="inline-block w-2 h-2 rounded-full bg-amber-400" />
-                <span className="text-amber-300">Local Cadastre Ready</span>
-              </>
+              <span className="flex items-center gap-1 text-amber-300">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400" />
+                <span className="hidden md:inline">Cadastre Store</span>
+              </span>
             ) : (
-              <>
-                <span className="inline-block w-2 h-2 rounded-full bg-slate-400 animate-pulse" />
-                <span className="text-parchment/60">Connecting Engine…</span>
-              </>
+              <span className="text-parchment/60 text-[10px]">Connecting…</span>
             )}
           </span>
-          <span className="hidden md:inline text-parchment/30">|</span>
-          <span className="hidden md:inline text-ochre-light">Unified Land DPI</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="hidden lg:inline text-parchment/50">EPSG:4326 · SRID 4326</span>
-          <span className="hidden sm:inline bg-ochre-dark/30 px-2 py-0.5 rounded text-[10px] text-ochre-light border border-ochre/30 font-semibold">
-            SIH 2026
+          <span className="text-parchment/30 hidden md:inline">|</span>
+          <span className="bg-ochre-dark/40 px-2 py-0.5 rounded text-[10px] text-ochre-light border border-ochre/30 font-medium">
+            Demo Environment · Synthetic Data
           </span>
         </div>
       </div>
@@ -117,8 +132,8 @@ export default function Navbar() {
       {/* Main Navbar */}
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 py-2.5">
         {/* Brand Logo & Wordmark */}
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-ink text-parchment font-serif text-lg font-bold shadow-sm transition-transform group-hover:scale-105">
+        <Link href="/" className="flex items-center gap-3 group">
+          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-ink text-parchment font-serif text-lg font-bold shadow-xs transition-transform group-hover:scale-102">
             भू
           </div>
           <div className="leading-tight">
@@ -126,14 +141,17 @@ export default function Navbar() {
               <span className="font-serif text-lg sm:text-xl font-bold tracking-tight text-ink">
                 BHU-SETU
               </span>
+              <span className="hidden lg:inline-block text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-ink/10 text-ink/80 font-semibold">
+                Land Stack DPI
+              </span>
             </div>
-            <div className="text-[10px] sm:text-[11px] font-medium tracking-wide text-ink/65 hidden sm:block">
-              Connecting Land Data · Empowering Land Governance
+            <div className="text-[10px] sm:text-[11px] font-medium tracking-normal text-ink/70">
+              Land Information &amp; Governance Platform
             </div>
           </div>
         </Link>
 
-        {/* Navigation Links */}
+        {/* Desktop Navigation Links */}
         <nav className="hidden lg:flex items-center gap-1">
           {navLinks.map((item) => {
             const active =
@@ -148,7 +166,7 @@ export default function Navbar() {
                 href={item.href}
                 className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
                   active
-                    ? "bg-ink text-parchment shadow-sm"
+                    ? "bg-ink text-parchment shadow-xs"
                     : "text-ink/75 hover:bg-ink/5 hover:text-ink"
                 }`}
               >
@@ -159,11 +177,11 @@ export default function Navbar() {
           })}
         </nav>
 
-        {/* User Context & Auth Controls */}
+        {/* User Context, Auth Controls & Mobile Menu Button */}
         <div className="flex items-center gap-2">
           {isAuthenticated && user ? (
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-ink/20 text-xs bg-parchment">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-ink/20 text-xs bg-parchment">
                 <User className="w-3.5 h-3.5 text-ink/60" />
                 <span className="font-semibold text-ink max-w-[120px] truncate">
                   {user.name || user.username || user.userId}
@@ -174,7 +192,7 @@ export default function Navbar() {
               </div>
               <button
                 onClick={logout}
-                className="p-1.5 text-ink/60 hover:text-brick hover:bg-brick/10 rounded transition-colors"
+                className="p-1.5 text-ink/60 hover:text-brick hover:bg-brick/10 rounded-md transition-colors"
                 title="Sign Out"
                 aria-label="Sign Out"
               >
@@ -185,22 +203,66 @@ export default function Navbar() {
             <div className="flex items-center gap-1.5">
               <Link
                 href="/login"
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded border border-ink/20 text-xs font-semibold text-ink hover:bg-ink/5 transition-colors"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-md border border-ink/25 text-xs font-semibold text-ink hover:bg-ink/5 transition-colors"
               >
                 <LogIn className="w-3.5 h-3.5" />
                 <span>Sign In</span>
               </Link>
               <Link
                 href="/signup"
-                className="flex items-center gap-1 bg-ink text-parchment px-2.5 py-1.5 rounded text-xs font-semibold hover:bg-ink-light transition-colors"
+                className="flex items-center gap-1 bg-ink text-parchment px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-ink-light transition-colors shadow-xs"
               >
                 <UserPlus className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Register</span>
               </Link>
             </div>
           )}
+
+          {/* Mobile Menu Toggle */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-1.5 rounded-md lg:hidden text-ink/75 hover:bg-ink/5 hover:text-ink transition-colors"
+            aria-label="Toggle navigation menu"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
       </div>
+
+      {/* Mobile Navigation Drawer */}
+      {mobileMenuOpen && (
+        <div className="lg:hidden border-t border-ink/10 bg-parchment-dark/95 px-4 py-3 space-y-1 font-sans">
+          <div className="text-[10px] font-mono uppercase text-ink/50 font-semibold px-2 py-1">
+            Portal Navigation
+          </div>
+          {navLinks.map((item) => {
+            const active =
+              pathname === item.href ||
+              (item.href !== "/" &&
+                pathname.startsWith(item.href) &&
+                (item.href !== "/officer" || pathname === "/officer"));
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition-all ${
+                  active
+                    ? "bg-ink text-parchment"
+                    : "text-ink/80 hover:bg-ink/5"
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+          <div className="pt-2 border-t border-ink/10 flex items-center justify-between text-[11px] font-mono text-ink/60 px-2">
+            <span>SRID 4326 · PostGIS</span>
+            <span>SIH 2026 Prototype</span>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

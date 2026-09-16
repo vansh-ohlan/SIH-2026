@@ -118,6 +118,75 @@ body {
   fill-opacity: 0.14 !important;
 }
 
+/* Land Stack Semantic Status Badges & Utilities */
+.badge-verified {
+  background-color: rgba(47, 82, 51, 0.15);
+  color: #2F5233;
+  border: 1px solid rgba(47, 82, 51, 0.3);
+}
+
+.badge-warning {
+  background-color: rgba(217, 119, 6, 0.15);
+  color: #92400E;
+  border: 1px solid rgba(217, 119, 6, 0.3);
+}
+
+.badge-conflict {
+  background-color: rgba(176, 67, 45, 0.15);
+  color: #991B1B;
+  border: 1px solid rgba(176, 67, 45, 0.3);
+}
+
+.badge-review {
+  background-color: rgba(30, 58, 138, 0.12);
+  color: #1E3A8A;
+  border: 1px solid rgba(30, 58, 138, 0.25);
+}
+
+.badge-neutral {
+  background-color: rgba(20, 33, 61, 0.08);
+  color: #14213D;
+  border: 1px solid rgba(20, 33, 61, 0.15);
+}
+
+/* Subtle Government Data Tables */
+.gov-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: left;
+}
+
+.gov-table th {
+  padding: 0.625rem 0.875rem;
+  font-family: var(--font-plex-mono), monospace;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(20, 33, 61, 0.6);
+  border-bottom: 1.5px solid rgba(20, 33, 61, 0.15);
+  background-color: rgba(227, 225, 210, 0.35);
+}
+
+.gov-table td {
+  padding: 0.625rem 0.875rem;
+  font-size: 0.75rem;
+  color: #14213D;
+  border-bottom: 1px solid rgba(20, 33, 61, 0.08);
+  vertical-align: middle;
+}
+
+.gov-table tr:hover td {
+  background-color: rgba(20, 33, 61, 0.03);
+}
+
+/* Accessible Focus States */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid #C08A28;
+  outline-offset: 2px;
+}
+
 /* Print Rules for Tamper-Evident Public Ledger Certificate */
 @media print {
   header, footer, .no-print {
