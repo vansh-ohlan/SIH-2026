@@ -14,6 +14,8 @@ import {
   LogOut, 
   LogIn,
   Search,
+  User,
+  UserPlus
 } from "lucide-react";
 
 export default function Navbar() {
@@ -31,13 +33,38 @@ export default function Navbar() {
     };
   }, []);
 
-  const navLinks = [
-    { href: "/citizen", label: "Citizen Portal", icon: Search },
-    { href: "/map", label: "GIS Map", icon: Layers },
-    { href: "/officer", label: "Officer Hub", icon: Compass },
-    { href: "/officer/conflicts", label: "Conflicts", icon: ShieldAlert },
-    { href: "/officer/mutations", label: "Mutations", icon: FileCheck2 },
-  ];
+  const getNavLinks = () => {
+    switch (role) {
+      case "revenue_officer":
+        return [
+          { href: "/officer", label: "Officer Hub", icon: Compass },
+          { href: "/officer/conflicts", label: "Conflicts", icon: ShieldAlert },
+          { href: "/officer/mutations", label: "Mutations", icon: FileCheck2 },
+          { href: "/map", label: "GIS Map", icon: Layers },
+        ];
+      case "registrar":
+        return [
+          { href: "/registrar", label: "Registrar Portal", icon: Compass },
+          { href: "/officer/mutations", label: "Mutations", icon: FileCheck2 },
+          { href: "/map", label: "GIS Map", icon: Layers },
+        ];
+      case "admin":
+        return [
+          { href: "/admin", label: "Admin Console", icon: Compass },
+          { href: "/officer", label: "Officer Hub", icon: Compass },
+          { href: "/officer/conflicts", label: "Conflicts", icon: ShieldAlert },
+          { href: "/map", label: "GIS Map", icon: Layers },
+        ];
+      case "citizen":
+      default:
+        return [
+          { href: "/citizen", label: "Citizen Portal", icon: Search },
+          { href: "/map", label: "GIS Map", icon: Layers },
+        ];
+    }
+  };
+
+  const navLinks = getNavLinks();
 
   const roleLabels: Record<string, { label: string; badgeClass: string }> = {
     citizen: { label: "Citizen", badgeClass: "bg-ink/10 text-ink" },
@@ -55,35 +82,35 @@ export default function Navbar() {
         <div className="flex items-center gap-2.5">
           <span className="flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-ochre animate-pulse" />
-            <span className="font-semibold text-parchment">Bhu-Setu Prototype</span>
+            <span className="font-semibold text-parchment">Bhu-Setu</span>
           </span>
           <span className="hidden sm:inline text-parchment/30">|</span>
           <span className="flex items-center gap-1.5">
             {isBackendLive === true ? (
               <>
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />
-                <span className="text-emerald-300 font-semibold">PostGIS Connected</span>
+                <span className="text-emerald-300 font-semibold">PostGIS Engine Active</span>
               </>
             ) : isBackendLive === false ? (
               <>
                 <span className="inline-block w-2 h-2 rounded-full bg-amber-400" />
-                <span className="text-amber-300">Demo Mode</span>
+                <span className="text-amber-300">Local Cadastre Ready</span>
               </>
             ) : (
               <>
                 <span className="inline-block w-2 h-2 rounded-full bg-slate-400 animate-pulse" />
-                <span className="text-parchment/60">Checking API…</span>
+                <span className="text-parchment/60">Connecting Engine…</span>
               </>
             )}
           </span>
           <span className="hidden md:inline text-parchment/30">|</span>
-          <span className="hidden md:inline text-ochre-light">SIH 2026</span>
+          <span className="hidden md:inline text-ochre-light">Unified Land DPI</span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="hidden sm:inline bg-ochre-dark/30 px-2 py-0.5 rounded text-[10px] text-ochre-light border border-ochre/30 font-semibold">
-            Prototype / Demo Dataset
-          </span>
           <span className="hidden lg:inline text-parchment/50">EPSG:4326 · SRID 4326</span>
+          <span className="hidden sm:inline bg-ochre-dark/30 px-2 py-0.5 rounded text-[10px] text-ochre-light border border-ochre/30 font-semibold">
+            SIH 2026
+          </span>
         </div>
       </div>
 
@@ -98,9 +125,6 @@ export default function Navbar() {
             <div className="flex items-center gap-2">
               <span className="font-serif text-lg sm:text-xl font-bold tracking-tight text-ink">
                 BHU-SETU
-              </span>
-              <span className="rounded bg-ink/10 px-1.5 py-0.5 font-mono text-[9px] font-bold text-ink/70">
-                PROTOTYPE
               </span>
             </div>
             <div className="text-[10px] sm:text-[11px] font-medium tracking-wide text-ink/65 hidden sm:block">
@@ -137,34 +161,43 @@ export default function Navbar() {
 
         {/* User Context & Auth Controls */}
         <div className="flex items-center gap-2">
-          <Link
-            href="/login"
-            className="flex items-center gap-1.5 px-2 py-1 rounded border border-ink/20 text-xs hover:border-ink/40 transition-colors bg-parchment"
-            title="Switch Demo Role"
-          >
-            <UserCheck className="w-3.5 h-3.5 text-ink/60" />
-            <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${currentRoleInfo.badgeClass}`}>
-              {currentRoleInfo.label}
-            </span>
-          </Link>
-
-          {isAuthenticated ? (
-            <button
-              onClick={logout}
-              className="p-1.5 text-ink/60 hover:text-brick hover:bg-brick/10 rounded transition-colors"
-              title="Sign Out"
-              aria-label="Sign Out"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+          {isAuthenticated && user ? (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-ink/20 text-xs bg-parchment">
+                <User className="w-3.5 h-3.5 text-ink/60" />
+                <span className="font-semibold text-ink max-w-[120px] truncate">
+                  {user.name || user.username || user.userId}
+                </span>
+                <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded ${currentRoleInfo.badgeClass}`}>
+                  {currentRoleInfo.label}
+                </span>
+              </div>
+              <button
+                onClick={logout}
+                className="p-1.5 text-ink/60 hover:text-brick hover:bg-brick/10 rounded transition-colors"
+                title="Sign Out"
+                aria-label="Sign Out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
           ) : (
-            <Link
-              href="/login"
-              className="flex items-center gap-1 bg-ink text-parchment px-2.5 py-1.5 rounded text-xs font-semibold hover:bg-ink-light transition-colors"
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>Login</span>
-            </Link>
+            <div className="flex items-center gap-1.5">
+              <Link
+                href="/login"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded border border-ink/20 text-xs font-semibold text-ink hover:bg-ink/5 transition-colors"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sign In</span>
+              </Link>
+              <Link
+                href="/signup"
+                className="flex items-center gap-1 bg-ink text-parchment px-2.5 py-1.5 rounded text-xs font-semibold hover:bg-ink-light transition-colors"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Register</span>
+              </Link>
+            </div>
           )}
         </div>
       </div>
