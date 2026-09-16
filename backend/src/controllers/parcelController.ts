@@ -32,6 +32,17 @@ export class ParcelController {
       next(error);
     }
   }
+
+  public async getReconciliation(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { ulpid } = parcelParamSchema.parse(req.params);
+      const report = await parcelService.getParcelReconciliation(ulpid);
+      res.status(200).json(report);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const parcelController = new ParcelController();
+

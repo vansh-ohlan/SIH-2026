@@ -5,8 +5,8 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import Navbar from "@/components/Navbar";
 import ConflictBadge from "@/components/ConflictBadge";
-import { getParcel, getConflicts } from "@/lib/api";
-import { Parcel, Conflict } from "@/lib/types";
+import { getParcel, getConflicts, getParcelReconciliation } from "@/lib/api";
+import { Parcel, Conflict, ParcelReconciliationReport } from "@/lib/types";
 import {
   MapPin,
   Calendar,
@@ -22,6 +22,9 @@ import {
   Copy,
   Check,
   HelpCircle,
+  GitCompare,
+  BadgeAlert,
+  ShieldCheck,
 } from "lucide-react";
 
 const MapView = dynamic(() => import("@/components/MapView"), {
@@ -41,14 +44,16 @@ export default function ParcelDetail({
   const { ulpid } = params;
   const [parcel, setParcel] = useState<Parcel | null | undefined>(undefined);
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
+  const [reconReport, setReconReport] = useState<ParcelReconciliationReport | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "conflicts" | "ownership" | "tax" | "mutations" | "map"
+    "overview" | "conflicts" | "reconciliation" | "ownership" | "tax" | "mutations" | "map"
   >("overview");
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     getParcel(ulpid).then(setParcel);
     getConflicts(ulpid).then(setConflicts);
+    getParcelReconciliation(ulpid).then(setReconReport);
   }, [ulpid]);
 
   const copyUlpid = () => {
@@ -172,22 +177,44 @@ export default function ParcelDetail({
             </div>
 
             {/* Badges */}
+            {/* Status Badges */}
             <div className="flex flex-wrap items-center gap-2">
               <span className="bg-ink/10 text-ink px-3 py-1 rounded-full text-xs font-semibold font-mono">
                 {parcel.land_use}
               </span>
 
-              {hasAreaMismatch || conflicts.length > 0 ? (
-                <div className="flex items-center gap-1.5 bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1 rounded-full text-xs font-semibold">
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
-                  <span>⚠ Conflict Detected</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 bg-land/20 text-land border border-land/30 px-3 py-1 rounded-full text-xs font-semibold">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>✓ Verified</span>
-                </div>
-              )}
+              {(() => {
+                const status = parcel.record_status || (reconReport?.has_conflicts ? "Conflict Detected" : "Verified");
+                if (status === "Verified") {
+                  return (
+                    <div className="flex items-center gap-1.5 bg-land/20 text-land border border-land/30 px-3 py-1 rounded-full text-xs font-semibold">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>✓ Record Verified</span>
+                    </div>
+                  );
+                } else if (status === "Under Review") {
+                  return (
+                    <div className="flex items-center gap-1.5 bg-blue-100 text-blue-900 border border-blue-300 px-3 py-1 rounded-full text-xs font-semibold">
+                      <HelpCircle className="w-3.5 h-3.5 text-blue-700" />
+                      <span>ℹ Under Review</span>
+                    </div>
+                  );
+                } else if (status === "Needs Verification") {
+                  return (
+                    <div className="flex items-center gap-1.5 bg-yellow-100 text-yellow-900 border border-yellow-300 px-3 py-1 rounded-full text-xs font-semibold">
+                      <AlertTriangle className="w-3.5 h-3.5 text-yellow-700" />
+                      <span>⚠ Needs Verification</span>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div className="flex items-center gap-1.5 bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1 rounded-full text-xs font-semibold">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
+                      <span>⚠ Conflict Detected</span>
+                    </div>
+                  );
+                }
+              })()}
             </div>
           </div>
 
@@ -226,7 +253,8 @@ export default function ParcelDetail({
         <div className="flex border-b border-ink/15 mb-6 overflow-x-auto gap-1 text-xs font-medium">
           {[
             { id: "overview", label: "Overview & Spatial Specs", icon: FileText },
-            { id: "conflicts", label: `Inconsistencies & Area Analysis (${conflicts.length || (hasAreaMismatch ? 1 : 0)})`, icon: ShieldAlert, highlight: hasAreaMismatch || conflicts.length > 0 },
+            { id: "reconciliation", label: `Multi-Source Reconciliation (${reconReport?.findings.length ?? 0})`, icon: GitCompare, highlight: (reconReport?.findings.length ?? 0) > 0 },
+            { id: "conflicts", label: `Inconsistencies (${conflicts.length || (hasAreaMismatch ? 1 : 0)})`, icon: ShieldAlert, highlight: hasAreaMismatch || conflicts.length > 0 },
             { id: "ownership", label: "Title & RoR Records", icon: Building },
             { id: "tax", label: "Tax & Municipal Status", icon: Calendar },
             { id: "mutations", label: `Mutation Ledger (${parcel.mutations?.length || 0})`, icon: History },
@@ -368,7 +396,201 @@ export default function ParcelDetail({
         )}
 
         {/* ============================================================ */}
-        {/* TAB 2: CONFLICTS & AREA MISMATCH (Primary Demo Information)  */}
+        {/* TAB 2: MULTI-SOURCE DATA RECONCILIATION                      */}
+        {/* ============================================================ */}
+        {activeTab === "reconciliation" && (
+          <div className="space-y-6">
+            {/* Header / Synthetic Disclaimer Banner */}
+            <div className="bg-parchment p-4 rounded-xl plot-border-solid flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] font-bold uppercase bg-ochre/20 text-ochre-dark px-2 py-0.5 rounded">
+                    [DEMO / SYNTHETIC DATA]
+                  </span>
+                  <span className="text-xs font-bold text-ink">
+                    Cross-System Cadastral Reconciliation Engine
+                  </span>
+                </div>
+                <p className="text-[11px] text-ink/70 mt-1">
+                  Automated comparison across State RoR (Bhulekh), Bhu-Naksha GIS, NGDRS Sub-Registrar deeds, and Municipal Master Plans.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-mono text-ink/60">Match Score:</span>
+                <span className="font-mono text-xs font-bold bg-ink text-parchment px-2.5 py-1 rounded">
+                  {Math.round((reconReport?.confidence_score ?? 0.88) * 100)}%
+                </span>
+              </div>
+            </div>
+
+            {/* Source of Truth Adapters 4-Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+              {/* 1. State RoR */}
+              <div className="bg-parchment p-3.5 rounded-lg plot-border space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[10px] uppercase font-bold text-ochre-dark">
+                    1. State RoR (Bhulekh)
+                  </span>
+                  <span className="h-2 w-2 rounded-full bg-land" title="Adapter Online" />
+                </div>
+                <div className="font-serif font-bold text-ink text-sm">
+                  {reconReport?.source_records?.state_ror?.declared_area_sqm ?? rorArea} sqm
+                </div>
+                <div className="text-[11px] text-ink/70 space-y-0.5">
+                  <div><strong>Khasra:</strong> {reconReport?.source_records?.state_ror?.khasra_no ?? parcel.survey_no}</div>
+                  <div><strong>Owner:</strong> {reconReport?.source_records?.state_ror?.owner_name ?? parcel.owner.name}</div>
+                  <div><strong>Khatauni:</strong> {reconReport?.source_records?.state_ror?.khatauni_no ?? "112"}</div>
+                </div>
+              </div>
+
+              {/* 2. Bhu-Naksha Cadastral GIS */}
+              <div className="bg-parchment p-3.5 rounded-lg plot-border space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[10px] uppercase font-bold text-ochre-dark">
+                    2. Bhu-Naksha GIS
+                  </span>
+                  <span className="h-2 w-2 rounded-full bg-land" title="Adapter Online" />
+                </div>
+                <div className="font-serif font-bold text-ink text-sm">
+                  {reconReport?.source_records?.cadastral_gis?.polygon_area_sqm ?? surveyedArea} sqm
+                </div>
+                <div className="text-[11px] text-ink/70 space-y-0.5">
+                  <div><strong>Perimeter:</strong> {reconReport?.source_records?.cadastral_gis?.perimeter_m ?? "142.5"} m</div>
+                  <div><strong>SRID:</strong> EPSG:{reconReport?.source_records?.cadastral_gis?.srid ?? "4326"}</div>
+                  <div><strong>Layer:</strong> Cadastral Ground Survey</div>
+                </div>
+              </div>
+
+              {/* 3. NGDRS Sub-Registrar */}
+              <div className="bg-parchment p-3.5 rounded-lg plot-border space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[10px] uppercase font-bold text-ochre-dark">
+                    3. NGDRS Registry
+                  </span>
+                  <span className="h-2 w-2 rounded-full bg-land" title="Adapter Online" />
+                </div>
+                <div className="font-serif font-bold text-ink text-sm truncate">
+                  {reconReport?.source_records?.registration_ngdrs?.deed_number ?? `DEED-${parcel.ulpid}`}
+                </div>
+                <div className="text-[11px] text-ink/70 space-y-0.5">
+                  <div><strong>Party:</strong> {reconReport?.source_records?.registration_ngdrs?.registered_party ?? parcel.owner.name}</div>
+                  <div><strong>Encumbrance:</strong> <span className="uppercase font-mono font-bold text-ochre-dark">{reconReport?.source_records?.registration_ngdrs?.encumbrance_status ?? "CLEAR"}</span></div>
+                  <div><strong>Date:</strong> {reconReport?.source_records?.registration_ngdrs?.registration_date ?? "2020-01-01"}</div>
+                </div>
+              </div>
+
+              {/* 4. Municipal Zoning */}
+              <div className="bg-parchment p-3.5 rounded-lg plot-border space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[10px] uppercase font-bold text-ochre-dark">
+                    4. Municipal Zoning
+                  </span>
+                  <span className="h-2 w-2 rounded-full bg-land" title="Adapter Online" />
+                </div>
+                <div className="font-serif font-bold text-ink text-sm">
+                  {reconReport?.source_records?.municipal_zoning?.zone_code ?? "ZONE-R2"}
+                </div>
+                <div className="text-[11px] text-ink/70 space-y-0.5">
+                  <div><strong>Permitted:</strong> {reconReport?.source_records?.municipal_zoning?.permitted_use ?? parcel.land_use}</div>
+                  <div><strong>Circle Rate:</strong> ₹{(reconReport?.source_records?.municipal_zoning?.circle_rate_per_sqm ?? parcel.rate_per_sqm ?? 6500).toLocaleString()}/sqm</div>
+                  <div><strong>Master Plan:</strong> Urban Cadastre 2031</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Detailed Findings & Comparison Table */}
+            <div className="bg-parchment rounded-xl plot-border-solid p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-ink/10 pb-3">
+                <div className="flex items-center gap-2">
+                  <GitCompare className="w-4 h-4 text-ochre-dark" />
+                  <h3 className="font-serif text-base font-bold text-ink">
+                    Cross-Reconciliation Findings Matrix
+                  </h3>
+                </div>
+                <span className="text-xs text-ink/60 font-mono">
+                  {reconReport?.findings.length ?? 0} Discrepanc{(reconReport?.findings.length ?? 0) === 1 ? "y" : "ies"} Flagged
+                </span>
+              </div>
+
+              {reconReport?.findings && reconReport.findings.length > 0 ? (
+                <div className="space-y-3">
+                  {reconReport.findings.map((f, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-4 rounded-lg border text-xs space-y-2 ${
+                        f.severity === "high"
+                          ? "bg-brick/5 border-brick/30"
+                          : f.severity === "medium"
+                          ? "bg-amber-50 border-amber-300"
+                          : "bg-parchment-dark/30 border-ink/15"
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-ink uppercase tracking-wider">
+                            {f.field_compared}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              f.severity === "high"
+                                ? "bg-brick text-parchment"
+                                : f.severity === "medium"
+                                ? "bg-amber-200 text-amber-900 border border-amber-400"
+                                : "bg-ink/10 text-ink"
+                            }`}
+                          >
+                            Severity: {f.severity}
+                          </span>
+                        </div>
+
+                        <span className="font-mono text-[10px] font-bold text-ochre-dark bg-parchment px-2 py-0.5 rounded border border-ink/15">
+                          Action: {f.recommended_action.toUpperCase()}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
+                        <div className="p-2.5 bg-parchment rounded border border-ink/10">
+                          <div className="text-[10px] font-mono text-ink/50 uppercase">{f.source_a_name}</div>
+                          <div className="font-semibold text-ink mt-0.5">{f.source_a_value}</div>
+                        </div>
+                        <div className="p-2.5 bg-parchment rounded border border-ink/10">
+                          <div className="text-[10px] font-mono text-ink/50 uppercase">{f.source_b_name}</div>
+                          <div className="font-semibold text-ink mt-0.5">{f.source_b_value}</div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1 text-[11px] text-ink/80">
+                        <div>
+                          <strong>Reason:</strong> {f.reason}
+                        </div>
+                        <span className="font-mono font-bold text-ink shrink-0 ml-2">
+                          {f.difference}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-ink/60 space-y-2">
+                  <ShieldCheck className="w-8 h-8 text-land mx-auto" />
+                  <div className="font-bold text-sm text-ink">Zero Discrepancies Detected</div>
+                  <p className="text-xs max-w-md mx-auto">
+                    All source registers (Jamabandi RoR, PostGIS Cadastral Polygon, and NGDRS Deeds) match with 100% data integrity.
+                  </p>
+                </div>
+              )}
+
+              {/* Legal Disclaimer Box */}
+              <div className="mt-4 p-3 bg-parchment-dark/40 rounded-lg border border-ink/10 text-[11px] text-ink/70 leading-relaxed">
+                <strong>Decision Support Note:</strong> {reconReport?.disclaimer || "Automated cross-reconciliation is generated for decision support. Authorized Revenue Officers and Sub-Registrars make final statutory determinations."}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ============================================================ */}
+        {/* TAB 3: CONFLICTS & AREA MISMATCH (Primary Demo Information)  */}
         {/* ============================================================ */}
         {activeTab === "conflicts" && (
           <div className="space-y-6">

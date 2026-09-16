@@ -13,6 +13,7 @@ import {
   EncroachmentAlert,
   UtilityLine,
   OcrResult,
+  ParcelReconciliationReport,
 } from "./types";
 import {
   MOCK_PARCELS,
@@ -23,6 +24,7 @@ import {
   PILOT_REGIONS,
   MOCK_ENCROACHMENT_ALERTS,
   MOCK_UTILITIES,
+  getMockParcelReconciliation,
 } from "./mockData";
 
 const BASE_URL =
@@ -480,5 +482,13 @@ export async function submitOcrVerification(payload: {
         ? `RoR metadata for ${payload.ulpid} verified and synchronized.`
         : `Discrepancy flagged for ${payload.ulpid}: Dispatched to Officer Mutation Queue.`,
   };
+}
+
+// 8. Multi-Source Parcel Cross-Reconciliation: GET /api/parcel/{ulpid}/reconciliation
+export async function getParcelReconciliation(ulpid: string): Promise<ParcelReconciliationReport> {
+  const { data } = await tryFetch<ParcelReconciliationReport>(`/parcel/${ulpid}/reconciliation`);
+  if (data) return data;
+  await sleep(100);
+  return getMockParcelReconciliation(ulpid);
 }
 
