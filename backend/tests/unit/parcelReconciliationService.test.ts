@@ -181,4 +181,123 @@ describe('ParcelReconciliationService (Stage 4 Multi-Source GIS Reconciliation)'
     expect(report.record_status).toBe('verified');
     expect(report.confidence_score).toBe(0.95);
   });
+
+  it('should flag missing survey number in RoR with recommended action "verify"', async () => {
+    mockRepo.findByUlpid.mockResolvedValue(baseParcel);
+    mockRorAdapter.fetchRoRByUlpid.mockResolvedValue({
+      khewat_no: '74/82',
+      khatauni_no: '112',
+      khasra_no: '', // missing
+      declared_area_sqm: 1250,
+      owner_name: 'Ramesh Kumar',
+      village: 'Burj Littan',
+      district: 'Ludhiana',
+      state: 'Punjab',
+      last_mutation_date: '2011-04-12'
+    });
+    mockGisAdapter.fetchParcelGeometry.mockResolvedValue({
+      calculated_area_sqm: 1250,
+      perimeter_meters: 142.5,
+      centroid: [30.905, 75.855],
+      srid: 4326,
+      layer_name: 'PB_Ludhiana_Cadastral_2026'
+    });
+    mockDeedAdapter.fetchDeedByUlpid.mockResolvedValue({
+      deed_number: 'DEED-2011-LDH-4821',
+      registration_date: '2011-04-12',
+      registered_party: 'Ramesh Kumar',
+      encumbrance_status: 'clear'
+    });
+
+    const report = await service.reconcileParcel('PB-LDH-0042');
+
+    const surveyFinding = report.findings.find((f) => f.field_compared.includes('Survey / Khasra'));
+    expect(surveyFinding).toBeDefined();
+    expect(surveyFinding?.severity).toBe('medium');
+    expect(surveyFinding?.recommended_action).toBe('verify');
+  });
+
+  it('should flag active encumbrance under review from NGDRS Registry', async () => {
+    mockRepo.findByUlpid.mockResolvedValue(baseParcel);
+    mockRorAdapter.fetchRoRByUlpid.mockResolvedValue({
+      khewat_no: '74/82',
+      khatauni_no: '112',
+      khasra_no: '142/3',
+      declared_area_sqm: 1250,
+      owner_name: 'Ramesh Kumar',
+      village: 'Burj Littan',
+      district: 'Ludhiana',
+      state: 'Punjab',
+      last_mutation_date: '2011-04-12'
+    });
+    mockGisAdapter.fetchParcelGeometry.mockResolvedValue({
+      calculated_area_sqm: 1250,
+      perimeter_meters: 142.5,
+      centroid: [30.905, 75.855],
+      srid: 4326,
+      layer_name: 'PB_Ludhiana_Cadastral_2026'
+    });
+    mockDeedAdapter.fetchDeedByUlpid.mockResolvedValue({
+      deed_number: 'DEED-2011-LDH-4821',
+      registration_date: '2011-04-12',
+      registered_party: 'Ramesh Kumar',
+      encumbrance_status: 'under_review',
+      pending_mutation_claim: {
+        claimant: 'Ramesh Kumar',
+        filing_date: '2026-09-08',
+        nature_of_transfer: 'Boundary Survey Reconciliation'
+      }
+    });
+
+    const report = await service.reconcileParcel('PB-LDH-0042');
+
+    const encFinding = report.findings.find((f) => f.field_compared.includes('Encumbrance'));
+    expect(encFinding).toBeDefined();
+    expect(encFinding?.source_a_value).toBe('Status: UNDER_REVIEW');
+    expect(encFinding?.severity).toBe('medium');
+  });
+
+  it('should assign "needs_verification" when tax dues are unpaid without other critical conflicts', async () => {
+    const unpaidParcel: ParcelRecord = {
+      ...baseParcel,
+      ulpid: 'PB-LDH-0043',
+      area_sqm: 980,
+      ror_area_sqm: 980,
+      surveyed_area_sqm: 980,
+      tax_status: { paid: false, last_paid: '2024-11-15', dues: 3200 },
+      record_status: 'needs_verification'
+    };
+
+    mockRepo.findByUlpid.mockResolvedValue(unpaidParcel);
+    mockRorAdapter.fetchRoRByUlpid.mockResolvedValue({
+      khewat_no: '88/90',
+      khatauni_no: '145',
+      khasra_no: '142/4',
+      declared_area_sqm: 980,
+      owner_name: 'Suresh Singh',
+      village: 'Burj Littan',
+      district: 'Ludhiana',
+      state: 'Punjab',
+      last_mutation_date: '2016-08-20'
+    });
+    mockGisAdapter.fetchParcelGeometry.mockResolvedValue({
+      calculated_area_sqm: 980,
+      perimeter_meters: 125.0,
+      centroid: [30.905, 75.865],
+      srid: 4326,
+      layer_name: 'PB_Ludhiana_Cadastral_2026'
+    });
+    mockDeedAdapter.fetchDeedByUlpid.mockResolvedValue({
+      deed_number: 'DEED-2016-LDH-1902',
+      registration_date: '2016-08-20',
+      registered_party: 'Suresh Singh',
+      encumbrance_status: 'clear'
+    });
+
+    const report = await service.reconcileParcel('PB-LDH-0043');
+
+    expect(report.findings.length).toBe(0);
+    expect(report.record_status).toBe('needs_verification');
+  });
 });
+

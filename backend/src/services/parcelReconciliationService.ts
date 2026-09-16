@@ -56,7 +56,7 @@ export class ParcelReconciliationService implements IParcelReconciliationService
     const surveyNo = parcel?.survey_no || rorData?.khasra_no || '142/3';
     const village = parcel?.village || rorData?.village || (ulpid.startsWith('PB') ? 'Burj Littan' : ulpid.startsWith('TN') ? 'Nemili' : 'Sector 17');
     const district = parcel?.district || rorData?.district || (ulpid.startsWith('PB') ? 'Ludhiana' : ulpid.startsWith('TN') ? 'Kanchipuram' : 'Chandigarh');
-    const state = parcel?.state || rorData?.state || (ulpid.startsWith('PB') ? 'Punjab' : ulpid.startsWith('TN') ? 'Tamil Nadu' : 'Chandigarh');
+    const state = parcel?.state || rorData?.state || (ulpid.startsWith('PB') ? 'Punjab' : ulpid.startsWith('TN') ? 'Tamil Nadu' : 'Chandigarh (UT)');
 
     // Rule 1: RoR Declared Area vs Bhu-Naksha GIS Polygon Calculated Area
     const rorArea = rorData?.declared_area_sqm || parcel?.ror_area_sqm || (ulpid === 'PB-LDH-0042' ? 1250 : parcel?.area_sqm || 1000);
@@ -90,7 +90,7 @@ export class ParcelReconciliationService implements IParcelReconciliationService
           source_b_name: 'NGDRS Registered Deed',
           source_b_value: deedData.registered_party,
           difference: `Title mismatch: "${rorData.owner_name}" vs "${deedData.registered_party}"`,
-          reason: 'Deed registration record holder differs from active revenue revenue ledger, indicating possible unrecorded succession.',
+          reason: 'Deed registration record holder differs from active revenue ledger, indicating possible unrecorded succession.',
           severity: 'high',
           recommended_action: 'review'
         });
