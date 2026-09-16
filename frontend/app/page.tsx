@@ -76,7 +76,7 @@ export default function HomePage() {
 
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-grid border-b border-ink/10 py-14 sm:py-20 px-4 sm:px-6">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-7xl">
           <div className="flex items-center gap-2 font-mono text-xs text-ink/60 mb-3 flex-wrap">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="font-semibold text-ink">DIGITAL PUBLIC INFRASTRUCTURE</span>
@@ -143,7 +143,7 @@ export default function HomePage() {
       </section>
 
       {/* Integration Architecture / Process Section */}
-      <section className="mx-auto max-w-6xl px-4 sm:px-6 py-12 sm:py-16 w-full">
+      <section className="mx-auto max-w-7xl px-4 sm:px-6 py-12 sm:py-16 w-full">
         <div className="text-center max-w-3xl mx-auto mb-10">
           <div className="font-mono text-xs font-bold uppercase tracking-wider text-ochre-dark">
             Common Parcel Identity Framework
@@ -260,7 +260,7 @@ export default function HomePage() {
 
       {/* Demo Cadastral Parcels Section */}
       <section className="bg-parchment-dark/30 border-t border-b border-ink/10 py-12 px-4 sm:px-6">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-7xl">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-6 gap-3">
             <div>
               <div className="font-mono text-xs font-bold uppercase tracking-wider text-ochre-dark">
@@ -325,7 +325,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="border-t border-ink/10 bg-parchment py-6 px-4 sm:px-6 text-xs text-ink/60">
-        <div className="mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-3">
           <div>
             <strong>BHU-SETU</strong> · Smart India Hackathon 2026 (SIH 26014)
             <div className="text-[11px] text-ink/50 mt-0.5">

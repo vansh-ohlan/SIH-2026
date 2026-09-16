@@ -158,7 +158,7 @@ export default function ParcelDetail({
     <main className="min-h-screen bg-parchment flex flex-col justify-between">
       <Navbar />
 
-      <div className="mx-auto max-w-5xl px-4 sm:px-6 py-6 sm:py-8 w-full">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8 w-full">
         {/* Stage 5: Judge Demo Quick-Jumper Bar */}
         <div className="mb-4 bg-parchment-dark/60 p-2.5 rounded-lg border border-ink/15 flex flex-wrap items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-2">
@@ -173,7 +173,7 @@ export default function ParcelDetail({
               href="/citizen/parcel/PB-LDH-0042"
               className={`px-2.5 py-1 rounded transition-colors ${
                 parcel.ulpid === "PB-LDH-0042"
-                  ? "bg-ink text-parchment font-bold"
+                  ? "bg-ink text-parchment font-bold shadow-xs"
                   : "bg-parchment text-ink/75 hover:bg-ink/10 border border-ink/10"
               }`}
             >
@@ -183,7 +183,7 @@ export default function ParcelDetail({
               href="/citizen/parcel/PB-LDH-0044"
               className={`px-2.5 py-1 rounded transition-colors ${
                 parcel.ulpid === "PB-LDH-0044"
-                  ? "bg-ink text-parchment font-bold"
+                  ? "bg-ink text-parchment font-bold shadow-xs"
                   : "bg-parchment text-ink/75 hover:bg-ink/10 border border-ink/10"
               }`}
             >
@@ -193,7 +193,7 @@ export default function ParcelDetail({
               href="/citizen/parcel/PB-LDH-0043"
               className={`px-2.5 py-1 rounded transition-colors ${
                 parcel.ulpid === "PB-LDH-0043"
-                  ? "bg-ink text-parchment font-bold"
+                  ? "bg-ink text-parchment font-bold shadow-xs"
                   : "bg-parchment text-ink/75 hover:bg-ink/10 border border-ink/10"
               }`}
             >
@@ -203,7 +203,7 @@ export default function ParcelDetail({
               href="/citizen/parcel/CH-SEC-1701"
               className={`px-2.5 py-1 rounded transition-colors ${
                 parcel.ulpid === "CH-SEC-1701"
-                  ? "bg-ink text-parchment font-bold"
+                  ? "bg-ink text-parchment font-bold shadow-xs"
                   : "bg-parchment text-ink/75 hover:bg-ink/10 border border-ink/10"
               }`}
             >
@@ -225,7 +225,7 @@ export default function ParcelDetail({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowRequestModal(true)}
-              className="flex items-center gap-1.5 bg-ochre/20 hover:bg-ochre/30 text-ochre-dark border border-ochre/40 px-3 py-1 rounded text-xs font-bold transition-all"
+              className="flex items-center gap-1.5 bg-ochre/20 hover:bg-ochre/30 text-ochre-dark border border-ochre/40 px-3 py-1.5 rounded-md text-xs font-bold transition-all shadow-xs"
             >
               <Send className="w-3.5 h-3.5" />
               <span>Request Verification</span>
@@ -233,7 +233,7 @@ export default function ParcelDetail({
 
             <button
               onClick={() => window.print()}
-              className="flex items-center gap-1 hover:text-ink transition-colors px-2.5 py-1 rounded border border-ink/10 bg-parchment"
+              className="flex items-center gap-1 hover:text-ink transition-colors px-2.5 py-1.5 rounded-md border border-ink/15 bg-parchment shadow-xs"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Print Record</span>
@@ -244,19 +244,20 @@ export default function ParcelDetail({
         {/* ============================================================ */}
         {/* PARCEL HEADER CARD                                            */}
         {/* ============================================================ */}
-        <div className="bg-parchment p-5 sm:p-6 rounded-xl plot-border-solid shadow-sm mb-6">
+        <div className="bg-parchment p-5 sm:p-6 rounded-xl plot-border-solid shadow-xs mb-6">
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-mono text-xs font-bold text-ochre-dark tracking-wider uppercase">
-                  ULPID (UNIQUE LAND PARCEL ID)
+                  UNIQUE LAND PARCEL IDENTIFIER (ULPID)
                 </span>
                 <button
                   onClick={copyUlpid}
                   className="p-1 text-ink/40 hover:text-ink rounded transition-colors"
                   title="Copy ULPID"
+                  aria-label="Copy ULPID"
                 >
-                  {copied ? <Check className="w-3.5 h-3.5 text-land" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? <Check className="w-3.5 h-3.5 text-land" /> : <Copy className="w-3.5 h-3.5 text-ink/60" />}
                 </button>
               </div>
 
@@ -264,21 +265,23 @@ export default function ParcelDetail({
                 {parcel.ulpid}
               </h1>
 
-              <div className="text-sm font-bold text-ink/90 mt-1">
-                {parcel.owner.name} · <span className="text-xs text-ink/60 font-normal">Registered Titleholder</span>
+              <div className="text-sm font-bold text-ink/90 mt-1 flex items-center gap-2 flex-wrap">
+                <span>{parcel.owner.name}</span>
+                <span className="text-xs text-ink/50 font-normal">· Registered Titleholder</span>
+                <span className="text-xs text-ink/50 font-normal">· {parcel.district || "Ludhiana"}, {parcel.state || "Punjab"}</span>
               </div>
             </div>
 
             {/* Badges Ribbon */}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="bg-ink/10 text-ink px-3 py-1 rounded-full text-xs font-semibold font-mono">
+              <span className="bg-ink/10 text-ink px-3 py-1 rounded-md text-xs font-semibold font-mono border border-ink/15">
                 {parcel.land_use}
               </span>
 
               {/* Risk Engine Badge */}
               <button
                 onClick={() => setActiveTab("risk")}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-transform hover:scale-105 ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold border transition-transform hover:scale-102 shadow-xs ${
                   riskAnalysis.level === "HIGH"
                     ? "bg-red-100 text-red-950 border-red-300"
                     : riskAnalysis.level === "MODERATE"
@@ -288,35 +291,35 @@ export default function ParcelDetail({
                 title="Click to view full AI Land Risk Analysis"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>{riskAnalysis.score} / 100 · {riskAnalysis.level} RISK</span>
+                <span>{riskAnalysis.score}/100 · {riskAnalysis.level} RISK</span>
               </button>
 
               {(() => {
                 const status = parcel.record_status || (reconReport?.has_conflicts || hasAreaMismatch ? "Conflict Detected" : "Verified");
                 if (status === "Verified") {
                   return (
-                    <div className="flex items-center gap-1.5 bg-land/20 text-land border border-land/30 px-3 py-1 rounded-full text-xs font-semibold">
+                    <div className="flex items-center gap-1.5 bg-land/20 text-land border border-land/30 px-3 py-1 rounded-md text-xs font-semibold">
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>✓ Record Verified</span>
                     </div>
                   );
                 } else if (status === "Under Review") {
                   return (
-                    <div className="flex items-center gap-1.5 bg-blue-100 text-blue-900 border border-blue-300 px-3 py-1 rounded-full text-xs font-semibold">
+                    <div className="flex items-center gap-1.5 bg-blue-100 text-blue-900 border border-blue-300 px-3 py-1 rounded-md text-xs font-semibold">
                       <HelpCircle className="w-3.5 h-3.5 text-blue-700" />
                       <span>ℹ Under Review</span>
                     </div>
                   );
                 } else if (status === "Needs Verification") {
                   return (
-                    <div className="flex items-center gap-1.5 bg-yellow-100 text-yellow-900 border border-yellow-300 px-3 py-1 rounded-full text-xs font-semibold">
-                      <AlertTriangle className="w-3.5 h-3.5 text-yellow-700" />
+                    <div className="flex items-center gap-1.5 bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1 rounded-md text-xs font-semibold">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
                       <span>⚠ Needs Verification</span>
                     </div>
                   );
                 } else {
                   return (
-                    <div className="flex items-center gap-1.5 bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1 rounded-full text-xs font-semibold">
+                    <div className="flex items-center gap-1.5 bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1 rounded-md text-xs font-semibold">
                       <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
                       <span>⚠ Potential Area Mismatch</span>
                     </div>
@@ -326,12 +329,42 @@ export default function ParcelDetail({
             </div>
           </div>
 
+          {/* Land Area Reconciliation Summary Strip */}
+          <div className="mt-5 p-4 rounded-lg bg-parchment-dark/40 border border-ink/15">
+            <div className="text-[10px] font-mono uppercase font-bold text-ink/60 mb-2 flex items-center justify-between">
+              <span>LAND AREA RECONCILIATION SUMMARY</span>
+              <span>SRID 4326 PostGIS Geometry vs State RoR</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+              <div className="bg-parchment p-2.5 rounded border border-ink/10">
+                <span className="text-[10px] text-ink/60 uppercase font-mono block">State RoR Area (Jamabandi)</span>
+                <span className="font-serif text-base font-bold text-ink">{rorArea.toLocaleString()} sqm</span>
+              </div>
+              <div className="bg-parchment p-2.5 rounded border border-ink/10">
+                <span className="text-[10px] text-ink/60 uppercase font-mono block">Surveyed GIS Area (Bhu-Naksha)</span>
+                <span className="font-serif text-base font-bold text-ink">{surveyedArea.toLocaleString()} sqm</span>
+              </div>
+              <div className="bg-parchment p-2.5 rounded border border-ink/10">
+                <span className="text-[10px] text-ink/60 uppercase font-mono block">Area Difference / Delta</span>
+                <span className={`font-serif text-base font-bold ${hasAreaMismatch ? "text-amber-800" : "text-land"}`}>
+                  {hasAreaMismatch ? `${areaDiff} sqm (${((areaDiff / rorArea) * 100).toFixed(1)}%)` : "0 sqm (0.0%)"}
+                </span>
+              </div>
+              <div className="bg-parchment p-2.5 rounded border border-ink/10">
+                <span className="text-[10px] text-ink/60 uppercase font-mono block">Sync Status</span>
+                <span className={`text-xs font-bold font-mono ${hasAreaMismatch ? "text-amber-800" : "text-land"}`}>
+                  {hasAreaMismatch ? "⚠ Variance Flagged" : "✓ Fully Reconciled"}
+                </span>
+              </div>
+            </div>
+          </div>
+
           {/* Quick Metrics Ribbon */}
-          <div className="mt-5 pt-4 border-t border-ink/10 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+          <div className="mt-4 pt-3 border-t border-ink/10 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
             <div>
-              <div className="text-[11px] text-ink/50 uppercase font-mono">Total Extent</div>
-              <div className="font-serif text-lg font-bold text-ink mt-0.5">
-                {parcel.area_sqm.toLocaleString()} sqm
+              <div className="text-[11px] text-ink/50 uppercase font-mono">Survey / Khasra No</div>
+              <div className="font-mono font-bold text-ink mt-0.5">
+                {parcel.khasra_no || parcel.survey_no || "142/3"}
               </div>
             </div>
             <div>
@@ -1191,7 +1224,7 @@ export default function ParcelDetail({
         {/* ============================================================ */}
         {activeTab === "map" && (
           <div className="space-y-4">
-            <div className="h-[500px] w-full plot-border overflow-hidden rounded-lg relative shadow-sm">
+            <div className="h-[620px] w-full plot-border overflow-hidden rounded-xl relative shadow-sm">
               <MapView focus={[centerLat, centerLng]} selectedUlpidProp={parcel.ulpid} />
             </div>
           </div>
