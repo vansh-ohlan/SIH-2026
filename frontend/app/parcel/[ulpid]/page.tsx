@@ -30,17 +30,12 @@ import {
   Copy,
   Check,
   HelpCircle,
-<<<<<<< HEAD
   GitCompare,
-  BadgeAlert,
   ShieldCheck,
   Send,
   Sparkles,
   Clock,
   ExternalLink,
-=======
-  Sparkles,
->>>>>>> 8d893e1 (Add land risk scoring and GIS layer features)
 } from "lucide-react";
 
 const MapView = dynamic(() => import("@/components/MapView"), {
@@ -62,11 +57,14 @@ export default function ParcelDetail({
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
   const [reconReport, setReconReport] = useState<ParcelReconciliationReport | null>(null);
   const [activeTab, setActiveTab] = useState<
-<<<<<<< HEAD
-    "overview" | "conflicts" | "reconciliation" | "ownership" | "tax" | "mutations" | "map"
-=======
-    "overview" | "risk" | "conflicts" | "ownership" | "tax" | "mutations" | "map"
->>>>>>> 8d893e1 (Add land risk scoring and GIS layer features)
+    | "overview"
+    | "risk"
+    | "reconciliation"
+    | "conflicts"
+    | "ownership"
+    | "tax"
+    | "mutations"
+    | "map"
   >("overview");
   const [copied, setCopied] = useState(false);
 
@@ -149,6 +147,7 @@ export default function ParcelDetail({
   // Specific demo area discrepancy for PB-LDH-0042
   const rorArea = parcel.ror_area_sqm || (parcel.ulpid === "PB-LDH-0042" ? 1250 : parcel.area_sqm);
   const surveyedArea = parcel.surveyed_area_sqm || (parcel.ulpid === "PB-LDH-0042" ? 1180 : parcel.area_sqm);
+  const gisArea = surveyedArea;
   const areaDiff = Math.abs(rorArea - surveyedArea);
   const hasAreaMismatch = rorArea !== surveyedArea;
 
@@ -276,9 +275,24 @@ export default function ParcelDetail({
                 {parcel.land_use}
               </span>
 
-<<<<<<< HEAD
+              {/* Risk Engine Badge */}
+              <button
+                onClick={() => setActiveTab("risk")}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-transform hover:scale-105 ${
+                  riskAnalysis.level === "HIGH"
+                    ? "bg-red-100 text-red-950 border-red-300"
+                    : riskAnalysis.level === "MODERATE"
+                    ? "bg-amber-100 text-amber-950 border-amber-300"
+                    : "bg-emerald-100 text-emerald-950 border-emerald-300"
+                }`}
+                title="Click to view full AI Land Risk Analysis"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>{riskAnalysis.score} / 100 · {riskAnalysis.level} RISK</span>
+              </button>
+
               {(() => {
-                const status = parcel.record_status || (reconReport?.has_conflicts ? "Conflict Detected" : "Verified");
+                const status = parcel.record_status || (reconReport?.has_conflicts || hasAreaMismatch ? "Conflict Detected" : "Verified");
                 if (status === "Verified") {
                   return (
                     <div className="flex items-center gap-1.5 bg-land/20 text-land border border-land/30 px-3 py-1 rounded-full text-xs font-semibold">
@@ -304,40 +318,11 @@ export default function ParcelDetail({
                   return (
                     <div className="flex items-center gap-1.5 bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1 rounded-full text-xs font-semibold">
                       <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
-                      <span>⚠ Conflict Detected</span>
+                      <span>⚠ Potential Area Mismatch</span>
                     </div>
                   );
                 }
               })()}
-=======
-              {/* Risk Engine Badge */}
-              <button
-                onClick={() => setActiveTab("risk")}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-transform hover:scale-105 ${
-                  riskAnalysis.level === "HIGH"
-                    ? "bg-red-100 text-red-950 border-red-300"
-                    : riskAnalysis.level === "MODERATE"
-                    ? "bg-amber-100 text-amber-950 border-amber-300"
-                    : "bg-emerald-100 text-emerald-950 border-emerald-300"
-                }`}
-                title="Click to view full AI Land Risk Analysis"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>{riskAnalysis.score} / 100 · {riskAnalysis.level} RISK</span>
-              </button>
-
-              {hasAreaMismatch || conflicts.length > 0 ? (
-                <div className="flex items-center gap-1.5 bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1 rounded-full text-xs font-semibold">
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
-                  <span>⚠ Potential Area Mismatch</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 bg-land/20 text-land border border-land/30 px-3 py-1 rounded-full text-xs font-semibold">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>✓ Tax Paid &amp; Clear</span>
-                </div>
-              )}
->>>>>>> 8d893e1 (Add land risk scoring and GIS layer features)
             </div>
           </div>
 
@@ -375,12 +360,7 @@ export default function ParcelDetail({
         {/* ============================================================ */}
         <div className="flex border-b border-ink/15 mb-6 overflow-x-auto gap-1 text-xs font-medium">
           {[
-<<<<<<< HEAD
             { id: "overview", label: "Overview & Unified View", icon: FileText },
-            { id: "reconciliation", label: `Multi-Source Reconciliation (${reconReport?.findings.length ?? 0})`, icon: GitCompare, highlight: (reconReport?.findings.length ?? 0) > 0 },
-            { id: "conflicts", label: `Inconsistencies (${conflicts.length || (hasAreaMismatch ? 1 : 0)})`, icon: ShieldAlert, highlight: hasAreaMismatch || conflicts.length > 0 },
-=======
-            { id: "overview", label: "Overview & Spatial Specs", icon: FileText },
             {
               id: "risk",
               label: `🛡️ AI Land Risk Analysis (${riskAnalysis.score}/100)`,
@@ -388,12 +368,17 @@ export default function ParcelDetail({
               highlight: riskAnalysis.level === "HIGH" || riskAnalysis.level === "MODERATE",
             },
             {
+              id: "reconciliation",
+              label: `Multi-Source Reconciliation (${reconReport?.findings.length ?? 0})`,
+              icon: GitCompare,
+              highlight: (reconReport?.findings.length ?? 0) > 0,
+            },
+            {
               id: "conflicts",
               label: `Inconsistencies & Area Analysis (${conflicts.length || (hasAreaMismatch ? 1 : 0)})`,
               icon: ShieldAlert,
               highlight: hasAreaMismatch || conflicts.length > 0,
             },
->>>>>>> 8d893e1 (Add land risk scoring and GIS layer features)
             { id: "ownership", label: "Title & RoR Records", icon: Building },
             { id: "tax", label: "Tax & Municipal Status", icon: Calendar },
             { id: "mutations", label: `Mutation Ledger (${parcel.mutations?.length || 0})`, icon: History },
@@ -423,7 +408,57 @@ export default function ParcelDetail({
         {/* ============================================================ */}
         {activeTab === "overview" && (
           <div className="space-y-6">
-<<<<<<< HEAD
+            {/* AI Risk Analysis Quick Feature Banner */}
+            <div className="bg-parchment p-5 rounded-xl plot-border-solid shadow-sm space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`p-2.5 rounded-lg shrink-0 ${
+                      riskAnalysis.level === "HIGH"
+                        ? "bg-red-100 text-red-800 border border-red-300"
+                        : riskAnalysis.level === "MODERATE"
+                        ? "bg-amber-100 text-amber-800 border border-amber-300"
+                        : "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                    }`}
+                  >
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] uppercase font-bold text-ochre-dark">
+                        AI DUE-DILIGENCE ASSESSMENT
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                          riskAnalysis.level === "HIGH"
+                            ? "bg-red-200 text-red-900"
+                            : riskAnalysis.level === "MODERATE"
+                            ? "bg-amber-200 text-amber-900"
+                            : "bg-emerald-200 text-emerald-900"
+                        }`}
+                      >
+                        {riskAnalysis.score} / 100 · {riskAnalysis.level} RISK
+                      </span>
+                    </div>
+                    <h3 className="font-serif text-base font-bold text-ink mt-0.5">
+                      Land Due-Diligence &amp; Encumbrance Evaluation
+                    </h3>
+                    <p className="text-xs text-ink/75 mt-1 leading-relaxed">
+                      {riskAnalysis.summaryText}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setActiveTab("risk")}
+                  className="bg-ink text-parchment px-4 py-2 rounded text-xs font-bold hover:bg-ink-light shrink-0 transition-colors flex items-center gap-1.5 self-start sm:self-center shadow-sm"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-ochre" />
+                  <span>Inspect Risk Dossier →</span>
+                </button>
+              </div>
+            </div>
+
             {/* 1. Interactive Architectural Diagram: Core Value of Bhu-Setu */}
             <UnifiedParcelFlow parcel={parcel} reconReport={reconReport} mode="citizen" />
 
@@ -612,56 +647,6 @@ export default function ParcelDetail({
                       : "Record verified with tamper-evident audit record."}
                   </div>
                 </div>
-=======
-            {/* AI Risk Analysis Quick Feature Banner */}
-            <div className="bg-parchment p-5 rounded-xl plot-border-solid shadow-sm space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <div
-                    className={`p-2.5 rounded-lg shrink-0 ${
-                      riskAnalysis.level === "HIGH"
-                        ? "bg-red-100 text-red-800 border border-red-300"
-                        : riskAnalysis.level === "MODERATE"
-                        ? "bg-amber-100 text-amber-800 border border-amber-300"
-                        : "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                    }`}
-                  >
-                    <Sparkles className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] uppercase font-bold text-ochre-dark">
-                        AI DUE-DILIGENCE ASSESSMENT
-                      </span>
-                      <span
-                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded uppercase ${
-                          riskAnalysis.level === "HIGH"
-                            ? "bg-red-200 text-red-900"
-                            : riskAnalysis.level === "MODERATE"
-                            ? "bg-amber-200 text-amber-900"
-                            : "bg-emerald-200 text-emerald-900"
-                        }`}
-                      >
-                        {riskAnalysis.score} / 100 · {riskAnalysis.level} RISK
-                      </span>
-                    </div>
-                    <h3 className="font-serif text-base font-bold text-ink mt-0.5">
-                      Land Due-Diligence &amp; Encumbrance Evaluation
-                    </h3>
-                    <p className="text-xs text-ink/75 mt-1 leading-relaxed">
-                      {riskAnalysis.summaryText}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setActiveTab("risk")}
-                  className="bg-ink text-parchment px-4 py-2 rounded text-xs font-bold hover:bg-ink-light shrink-0 transition-colors flex items-center gap-1.5 self-start sm:self-center shadow-sm"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-ochre" />
-                  <span>Inspect Risk Dossier →</span>
-                </button>
->>>>>>> 8d893e1 (Add land risk scoring and GIS layer features)
               </div>
             </div>
 
@@ -785,8 +770,47 @@ export default function ParcelDetail({
         )}
 
         {/* ============================================================ */}
-<<<<<<< HEAD
-        {/* TAB 2: MULTI-SOURCE DATA RECONCILIATION                      */}
+        {/* TAB 2: AI LAND RISK & DUE-DILIGENCE ENGINE                   */}
+        {/* ============================================================ */}
+        {activeTab === "risk" && (
+          <div className="space-y-6">
+            {/* Top Row: Visual Gauge & AI Summary Card */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+              <div className="md:col-span-5">
+                <LandRiskScoreGauge
+                  score={riskAnalysis.score}
+                  level={riskAnalysis.level}
+                  indicatorsCount={riskAnalysis.totalIndicatorsEvaluated}
+                  lastAnalysis={riskAnalysis.analysisTimestamp}
+                />
+              </div>
+              <div className="md:col-span-7 flex flex-col justify-between">
+                <RiskSummaryCard
+                  summaryText={riskAnalysis.summaryText}
+                  disclaimer={riskAnalysis.disclaimer}
+                />
+              </div>
+            </div>
+
+            {/* Section 2: What is driving the risk? */}
+            <RiskDriversBarChart
+              drivers={riskAnalysis.topDrivers}
+              totalScore={riskAnalysis.score}
+            />
+
+            {/* Section 3: Recommended Verification Steps */}
+            <RiskRecommendations recommendations={riskAnalysis.recommendations} />
+
+            {/* Section 4: Detailed 13-Factor Breakdown */}
+            <RiskFactorBreakdown factors={riskAnalysis.factors} />
+
+            {/* Section 5: Risk Monitoring & History Timeline */}
+            <RiskHistoryTimeline history={riskAnalysis.history} />
+          </div>
+        )}
+
+        {/* ============================================================ */}
+        {/* TAB 3: MULTI-SOURCE DATA RECONCILIATION                      */}
         {/* ============================================================ */}
         {activeTab === "reconciliation" && (
           <div className="space-y-6">
@@ -976,53 +1000,11 @@ export default function ParcelDetail({
                 <strong>Decision Support Note:</strong> {reconReport?.disclaimer || "Automated cross-reconciliation is generated for decision support. Authorized Revenue Officers and Sub-Registrars make final statutory determinations."}
               </div>
             </div>
-=======
-        {/* TAB 2: AI LAND RISK & DUE-DILIGENCE ENGINE                   */}
-        {/* ============================================================ */}
-        {activeTab === "risk" && (
-          <div className="space-y-6">
-            {/* Top Row: Visual Gauge & AI Summary Card */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-              <div className="md:col-span-5">
-                <LandRiskScoreGauge
-                  score={riskAnalysis.score}
-                  level={riskAnalysis.level}
-                  indicatorsCount={riskAnalysis.totalIndicatorsEvaluated}
-                  lastAnalysis={riskAnalysis.analysisTimestamp}
-                />
-              </div>
-              <div className="md:col-span-7 flex flex-col justify-between">
-                <RiskSummaryCard
-                  summaryText={riskAnalysis.summaryText}
-                  disclaimer={riskAnalysis.disclaimer}
-                />
-              </div>
-            </div>
-
-            {/* Section 2: What is driving the risk? */}
-            <RiskDriversBarChart
-              drivers={riskAnalysis.topDrivers}
-              totalScore={riskAnalysis.score}
-            />
-
-            {/* Section 3: Recommended Verification Steps */}
-            <RiskRecommendations recommendations={riskAnalysis.recommendations} />
-
-            {/* Section 4: Detailed 13-Factor Breakdown */}
-            <RiskFactorBreakdown factors={riskAnalysis.factors} />
-
-            {/* Section 5: Risk Monitoring & History Timeline */}
-            <RiskHistoryTimeline history={riskAnalysis.history} />
->>>>>>> 8d893e1 (Add land risk scoring and GIS layer features)
           </div>
         )}
 
         {/* ============================================================ */}
-<<<<<<< HEAD
-        {/* TAB 3: CONFLICTS & AREA MISMATCH (Primary Demo Information)  */}
-=======
-        {/* TAB 3: CONFLICTS & AREA MISMATCH                             */}
->>>>>>> 8d893e1 (Add land risk scoring and GIS layer features)
+        {/* TAB 4: CONFLICTS & AREA MISMATCH                             */}
         {/* ============================================================ */}
         {activeTab === "conflicts" && (
           <div className="space-y-6">
@@ -1109,7 +1091,7 @@ export default function ParcelDetail({
         )}
 
         {/* ============================================================ */}
-        {/* TAB 4: TITLE & RoR RECORDS                                   */}
+        {/* TAB 5: TITLE & RoR RECORDS                                   */}
         {/* ============================================================ */}
         {activeTab === "ownership" && (
           <div className="bg-parchment p-6 rounded-lg plot-border space-y-4">
@@ -1140,7 +1122,7 @@ export default function ParcelDetail({
         )}
 
         {/* ============================================================ */}
-        {/* TAB 5: TAX & MUNICIPAL STATUS                                */}
+        {/* TAB 6: TAX & MUNICIPAL STATUS                                */}
         {/* ============================================================ */}
         {activeTab === "tax" && (
           <div className="bg-parchment p-6 rounded-lg plot-border space-y-4">
@@ -1173,7 +1155,7 @@ export default function ParcelDetail({
         )}
 
         {/* ============================================================ */}
-        {/* TAB 6: MUTATION LEDGER & SHA-256 AUDIT CHAIN                 */}
+        {/* TAB 7: MUTATION LEDGER & SHA-256 AUDIT CHAIN                 */}
         {/* ============================================================ */}
         {activeTab === "mutations" && (
           <div className="bg-parchment p-6 rounded-lg plot-border space-y-6">
@@ -1205,7 +1187,7 @@ export default function ParcelDetail({
         )}
 
         {/* ============================================================ */}
-        {/* TAB 7: INTERACTIVE GIS MAP                                   */}
+        {/* TAB 8: INTERACTIVE GIS MAP                                   */}
         {/* ============================================================ */}
         {activeTab === "map" && (
           <div className="space-y-4">
@@ -1247,7 +1229,7 @@ export default function ParcelDetail({
                   <div className="p-3 bg-parchment-dark/40 rounded-lg border border-ink/10">
                     <div className="text-[10px] font-mono text-ink/50 uppercase">Target Parcel ULPID</div>
                     <div className="font-mono font-bold text-ink text-sm mt-0.5">{parcel.ulpid}</div>
-                    <div className="text-ink/70 mt-1">{parcel.owner.name} · {parcel.village}, {parcel.district}</div>
+                    <div className="text-ink/70 mt-1">{parcel.owner.name} · {parcel.village || "Ludhiana East"}, {parcel.district || "Ludhiana, Punjab"}</div>
                   </div>
 
                   <div>
@@ -1359,4 +1341,3 @@ function formatDate(iso: string) {
     day: "numeric",
   });
 }
-
