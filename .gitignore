@@ -22,7 +22,6 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
-
 # Python virtual environments
 .venv/
 .venv-wsl/
@@ -67,3 +66,6 @@ __pycache__/
 *.sqlite
 *.sqlite3
 bhusetu_dev.db
+
+# macOS
+.DS_Store
