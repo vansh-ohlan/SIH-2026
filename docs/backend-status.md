@@ -1,7 +1,7 @@
 # Bhu-Setu Backend Implementation Status
 
 **Current Branch**: `feature/stage4-parcel-gis-reconciliation`  
-**Current Milestone**: Stage 4 — Parcel-Centric GIS & Multi-Source Data Reconciliation  
+**Current Milestone**: Stage 5 — End-to-End Parcel Governance Demo Workflow  
 **Integration Branch**: `dev`  
 
 ---
@@ -20,12 +20,15 @@
   - Automated rule-based engine comparing RoR area vs GIS area, titleholder vs NGDRS registered party, survey numbers, and legal encumbrance statuses.
   - Generates structured, explainable findings (`field_compared`, `source_a_value`, `source_b_value`, `difference`, `reason`, `severity`, `recommended_action`).
   - Endpoint `GET /api/parcel/:ulpid/reconciliation`.
-- [x] **Dual-Persona Experience**:
-  - Citizen: Simplified, non-jargon lifecycle statuses (`Verified`, `Under Review`, `Needs Verification`, `Conflict Detected`).
-  - Officer: Deep comparative analysis matrix, multi-source records breakdown, and mutation adjudication.
-- [x] **Bidirectional GIS Map & Cadastral UI**:
-  - Interactive Leaflet mapping with polygon click selection, highlight styling, slide-out inspector, and multi-state region switching.
-- [x] **Comprehensive Test Suites**: Unit and integration tests for OCR, decision support, parcel reconciliation service, and API routes.
+- [x] **Stage 5 End-to-End Demo Workflow**:
+  - **Judge Demo Switcher Bar**: Rapid test cases across Punjab (`PB-LDH-0042`, `PB-LDH-0044`, `PB-LDH-0043`) and Chandigarh (`CH-SEC-1701`).
+  - **Unified Parcel Flow Banner (`UnifiedParcelFlow.tsx`)**: Visualizes 3 data adapter streams converging on atomic ULPIN anchor with variance metrics.
+  - **6-Category Reconciliation Summary Matrix**: Real-time cross-validation across Area, Survey, Owner, Deed, Encumbrance, and Master Plan.
+  - **5-Step Decision Lifecycle Timeline**: Transparent progression from citizen submission to tamper-evident sealed ledger.
+  - **Citizen Verification Request**: Interactive request modal with instant tracking receipt generation (`REQ-2026-PB-XXXX`).
+  - **Officer Mutation Adjudication Form**: Mandatory statutory findings log, confirmation safeguards, and SHA-256 audit receipt certificate with one-click copy.
+  - **Statutory Authority & Synthetic Disclaimers**: Clear decision-support boundaries and `[DEMO / SYNTHETIC DATA]` labels.
+- [x] **Comprehensive Test Suites**: Unit and integration tests covering OCR, decision support, PostGIS spatial queries, parcel cross-reconciliation, RBAC enforcement, and Stage 5 end-to-end governance workflow (`stage5GovernanceWorkflow.test.ts`).
 
 ---
 
@@ -34,4 +37,5 @@
 - GeoServer WFS/WMS live vector tile sync.
 - Real production government API endpoints (live state NIC/Bhulekh web services).
 - MeriPehchaan (National SSO) production OAuth integration.
+
 
