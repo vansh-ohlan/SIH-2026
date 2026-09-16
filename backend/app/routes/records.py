@@ -5,13 +5,19 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from backend.app.db import get_db, init_db
-from backend.app.models import LandRecord
-from backend.app.repositories import LandRecordRepository
+from backend.app.models import LandRecord, Parcel
+from backend.app.repositories import (
+    LandRecordRepository,
+    ParcelRepository,
+    load_record_analysis,
+)
+from backend.app.schemas import ConflictReportResponse
+from backend.app.services.conflict import ConflictEngine, build_conflict_report
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +46,33 @@ class LandRecordDetailResponse(LandRecordResponse):
 
     raw_analysis: Optional[str] = None
     explainability_evidence: Optional[str] = None
+
+
+class ParcelResponse(BaseModel):
+    """Response model for a parcel."""
+
+    id: int
+    ulpin: Optional[str] = None
+    khasra_number: Optional[str] = None
+    area_raw: Optional[str] = None
+    area_normalized: Optional[float] = None
+    area_unit: Optional[str] = None
+    land_classification: Optional[str] = None
+    land_type: Optional[str] = None
+    cultivation_status: Optional[str] = None
+    irrigation_source: Optional[str] = None
+    revenue: Optional[str] = None
+    remarks: Optional[str] = None
+    provenance: Optional[str] = None
+
+
+class ParcelSearchResponse(BaseModel):
+    """Response model for parcel search results."""
+
+    parcels: list[ParcelResponse] = Field(default_factory=list)
+    land_records: list[LandRecordResponse] = Field(default_factory=list)
+    total: int = 0
+    message: Optional[str] = None
 
 
 @router.post("/records", response_model=LandRecordResponse)
@@ -114,6 +147,37 @@ def get_land_record(
     )
 
 
+@router.get("/records/{record_id}/conflicts", response_model=ConflictReportResponse)
+def get_record_conflicts(
+    record_id: int,
+    db: Session = Depends(get_db),
+) -> ConflictReportResponse:
+    """Run the Conflict & Reconciliation Engine over a persisted land record.
+
+    Findings are recomputed on read rather than served from the stored
+    ``conflicts`` rows, so the response always reflects the current rule set
+    and stays deterministic for the same input. Conflicts originally reported
+    by the AI extraction stage are carried through unchanged under the
+    ``ai_extraction_conflict`` rule, each keeping its evidence and provenance.
+
+    Results are ordered by severity (most severe first), then rule order, then
+    field, issue type, and message.
+    """
+    repo = LandRecordRepository(db)
+    record = repo.get(record_id)
+    if record is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "not_found",
+                "message": f"Land record {record_id} not found.",
+            },
+        )
+
+    issues = ConflictEngine().run(load_record_analysis(record))
+    return ConflictReportResponse(**build_conflict_report(record.id, issues))
+
+
 @router.get("/records", response_model=list[LandRecordResponse])
 def list_land_records(
     limit: int = 100,
@@ -123,8 +187,9 @@ def list_land_records(
     """List all persisted LandRecords."""
     repo = LandRecordRepository(db)
     records = repo.list_all(limit=limit, offset=offset)
-    return [
-        LandRecordResponse(
+    result = []
+    for r in records:
+        result.append(LandRecordResponse(
             id=r.id,
             document_id=r.document_id,
             state=r.state,
@@ -137,6 +202,115 @@ def list_land_records(
             landholders_count=len(r.landholders),
             parcels_count=len(r.parcels),
             conflicts_count=len(r.conflicts),
+        ))
+    return result
+
+
+@router.get("/parcels/search", response_model=ParcelSearchResponse)
+def search_parcels(
+    ulpin: Optional[str] = Query(None, description="ULPIN (authoritative external identifier)"),
+    khasra_number: Optional[str] = Query(None, description="Khasra number"),
+    state: Optional[str] = Query(None, description="State"),
+    district: Optional[str] = Query(None, description="District"),
+    tehsil: Optional[str] = Query(None, description="Tehsil"),
+    village: Optional[str] = Query(None, description="Village"),
+    db: Session = Depends(get_db),
+) -> ParcelSearchResponse:
+    """Search parcels by ULPIN or khasra + administrative location.
+
+    At least one of ULPIN or khasra_number must be provided.
+    When khasra_number is used, administrative location fields narrow results.
+    """
+    parcel_repo = ParcelRepository(db)
+    record_repo = LandRecordRepository(db)
+
+    if ulpin is not None and ulpin.strip() != "":
+        parcel = parcel_repo.get_by_ulpin(ulpin.strip())
+        if parcel is None:
+            return ParcelSearchResponse(
+                parcels=[],
+                land_records=[],
+                total=0,
+                message="ULPIN not found",
+            )
+        record = record_repo.get(parcel.land_record_id)
+        return ParcelSearchResponse(
+            parcels=[_parcel_to_response(parcel)],
+            land_records=[_record_to_response(record)] if record else [],
+            total=1,
         )
-        for r in records
-    ]
+
+    if khasra_number is None or khasra_number.strip() == "":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_search",
+                "message": "Either ulpin or khasra_number must be provided.",
+            },
+        )
+
+    parcels = parcel_repo.get_by_khasra(
+        khasra_number=khasra_number.strip(),
+        state=state,
+        district=district,
+        tehsil=tehsil,
+        village=village,
+    )
+
+    if not parcels:
+        return ParcelSearchResponse(
+            parcels=[],
+            land_records=[],
+            total=0,
+            message="No parcels found matching the search criteria.",
+        )
+
+    records = []
+    seen_ids = set()
+    for p in parcels:
+        if p.land_record_id not in seen_ids:
+            rec = record_repo.get(p.land_record_id)
+            if rec:
+                records.append(_record_to_response(rec))
+                seen_ids.add(p.land_record_id)
+
+    return ParcelSearchResponse(
+        parcels=[_parcel_to_response(p) for p in parcels],
+        land_records=records,
+        total=len(parcels),
+    )
+
+
+def _parcel_to_response(parcel: Parcel) -> ParcelResponse:
+    return ParcelResponse(
+        id=parcel.id,
+        ulpin=parcel.ulpin,
+        khasra_number=parcel.khasra_number,
+        area_raw=parcel.area_raw,
+        area_normalized=parcel.area_normalized,
+        area_unit=parcel.area_unit,
+        land_classification=parcel.land_classification,
+        land_type=parcel.land_type,
+        cultivation_status=parcel.cultivation_status,
+        irrigation_source=parcel.irrigation_source,
+        revenue=parcel.revenue,
+        remarks=parcel.remarks,
+        provenance=parcel.provenance,
+    )
+
+
+def _record_to_response(record: LandRecord) -> LandRecordResponse:
+    return LandRecordResponse(
+        id=record.id,
+        document_id=record.document_id,
+        state=record.state,
+        district=record.district,
+        tehsil=record.tehsil,
+        village=record.village,
+        confidence_score=record.confidence_score,
+        risk_level=record.risk_level,
+        created_at=record.created_at.isoformat() if record.created_at else None,
+        landholders_count=len(record.landholders),
+        parcels_count=len(record.parcels),
+        conflicts_count=len(record.conflicts),
+    )

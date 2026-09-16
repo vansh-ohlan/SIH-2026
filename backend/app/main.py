@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from backend.app.config import BackendConfig
 from backend.app.db import init_db
 from backend.app.routes import router, get_config
+from backend.app.routes.land import router as land_router
 from backend.app.routes.records import router as records_router
 
 
@@ -32,6 +33,7 @@ def create_app(config: BackendConfig = None, database_url: str = None) -> FastAP
 
     application.include_router(router)
     application.include_router(records_router)
+    application.include_router(land_router)
 
     if config is not None:
         application.dependency_overrides[get_config] = lambda: config

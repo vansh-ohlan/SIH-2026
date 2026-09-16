@@ -104,6 +104,9 @@ class Parcel(Base):
     land_record_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("land_records.id"), index=True
     )
+    ulpin: Mapped[Optional[str]] = mapped_column(
+        String(64), index=True, unique=True, nullable=True
+    )
     khasra_number: Mapped[Optional[str]] = mapped_column(String(64), index=True)
     area_raw: Mapped[Optional[str]] = mapped_column(String(256))
     area_normalized: Mapped[Optional[float]] = mapped_column(Float)
@@ -119,7 +122,7 @@ class Parcel(Base):
     land_record: Mapped["LandRecord"] = relationship(back_populates="parcels")
 
     def __repr__(self) -> str:
-        return f"<Parcel(id={self.id}, khasra={self.khasra_number!r})>"
+        return f"<Parcel(id={self.id}, khasra={self.khasra_number!r}, ulpin={self.ulpin!r})>"
 
 
 class Conflict(Base):

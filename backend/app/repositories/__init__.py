@@ -134,6 +134,7 @@ def analysis_to_land_record(
 
         record.parcels.append(
             Parcel(
+                ulpin=_extract_value(parcel.get("ulpin")),
                 khasra_number=_extract_value(parcel.get("khasra_number")),
                 area_raw=area_raw,
                 area_normalized=area_norm,
@@ -162,6 +163,125 @@ def analysis_to_land_record(
             )
 
     return record
+
+
+def _wrap(value: Any, provenance: Any = None) -> Optional[dict[str, Any]]:
+    """Rebuild an extracted-field wrapper from a persisted column value."""
+    if value is None:
+        return None
+    field: dict[str, Any] = {"value": value}
+    if isinstance(provenance, dict) and provenance:
+        field["provenance"] = provenance
+    return field
+
+
+def _compact(mapping: dict[str, Any]) -> dict[str, Any]:
+    """Drop keys whose rebuilt field wrapper is empty."""
+    return {key: value for key, value in mapping.items() if value is not None}
+
+
+_METADATA_FIELDS: tuple[str, ...] = (
+    "document_id",
+    "state",
+    "district",
+    "tehsil",
+    "village",
+    "year",
+    "document_type",
+    "khata_number",
+    "khewat_number",
+    "khatoni_number",
+    "mutation_number",
+    "mutation_date",
+    "mutation_details",
+)
+
+
+def record_to_extraction(record: LandRecord) -> dict[str, Any]:
+    """Rebuild an extraction-shaped view of a persisted :class:`LandRecord`.
+
+    This is the fallback input for the Conflict & Reconciliation Engine when
+    ``raw_analysis`` is unavailable, so records that exist only as relational
+    rows can still be reconciled. Provenance is restored from the stored
+    provenance columns and from persisted conflict evidence.
+    """
+    metadata = _compact(
+        {name: _wrap(getattr(record, name, None)) for name in _METADATA_FIELDS}
+    )
+
+    landholders: list[dict[str, Any]] = []
+    for holder in record.landholders:
+        landholders.append(
+            _compact(
+                {
+                    "name": _wrap(holder.name, _deserialize(holder.provenance)),
+                    "father_or_husband_name": _wrap(holder.father_or_husband_name),
+                    "caste": _wrap(holder.caste),
+                    "address": _wrap(holder.address),
+                    "share": _wrap(holder.share),
+                    "is_cultivator": _wrap(holder.is_cultivator),
+                }
+            )
+        )
+
+    parcels: list[dict[str, Any]] = []
+    for parcel in record.parcels:
+        parcels.append(
+            _compact(
+                {
+                    "ulpin": _wrap(parcel.ulpin),
+                    "khasra_number": _wrap(
+                        parcel.khasra_number, _deserialize(parcel.provenance)
+                    ),
+                    "area_raw": _wrap(parcel.area_raw),
+                    "area_normalized": _wrap(parcel.area_normalized),
+                    "area_unit": _wrap(parcel.area_unit),
+                    "land_classification": _wrap(parcel.land_classification),
+                    "land_type": _wrap(parcel.land_type),
+                    "cultivation_status": _wrap(parcel.cultivation_status),
+                    "irrigation_source": _wrap(parcel.irrigation_source),
+                    "revenue": _wrap(parcel.revenue),
+                    "remarks": _wrap(parcel.remarks),
+                }
+            )
+        )
+
+    conflicts: list[dict[str, Any]] = []
+    for conflict in record.conflicts:
+        evidence = _deserialize(conflict.evidence)
+        entry = evidence if isinstance(evidence, dict) else {}
+        rebuilt: dict[str, Any] = {
+            "field": conflict.field,
+            "type": conflict.issue_type,
+            "severity": conflict.severity,
+            "message": conflict.message,
+        }
+        if isinstance(entry.get("provenance"), dict):
+            rebuilt["provenance"] = entry["provenance"]
+        conflicts.append(rebuilt)
+
+    return {
+        "extraction_result": {
+            "status": record.extraction_status or "success",
+            "metadata": metadata,
+            "landholders": landholders,
+            "parcels": parcels,
+            "conflicts": conflicts,
+        }
+    }
+
+
+def load_record_analysis(record: LandRecord) -> dict[str, Any]:
+    """Return the richest extraction view available for a persisted record.
+
+    Prefers the original ``raw_analysis`` payload because it retains every
+    field wrapper with full provenance; falls back to a view rebuilt from the
+    relational rows.
+    """
+    raw = _deserialize(record.raw_analysis)
+    if isinstance(raw, dict) and isinstance(raw.get("extraction_result"), dict):
+        return raw
+    return record_to_extraction(record)
 
 
 class LandRecordRepository:
@@ -212,3 +332,46 @@ class LandRecordRepository:
         self.db.delete(record)
         self.db.commit()
         return True
+
+
+class ParcelRepository:
+    """Repository for Parcel-centric retrieval operations."""
+
+    def __init__(self, db: Session) -> None:
+        self.db = db
+
+    def get_by_ulpin(self, ulpin: str) -> Optional[Parcel]:
+        """Get a Parcel by its ULPIN (authoritative external identifier)."""
+        return self.db.query(Parcel).filter(Parcel.ulpin == ulpin).first()
+
+    def get_by_khasra(
+        self,
+        khasra_number: str,
+        state: Optional[str] = None,
+        district: Optional[str] = None,
+        tehsil: Optional[str] = None,
+        village: Optional[str] = None,
+    ) -> list[Parcel]:
+        """Get Parcels by khasra number and optional administrative location."""
+        query = self.db.query(Parcel).filter(Parcel.khasra_number == khasra_number)
+
+        location_filters = [
+            condition
+            for condition in (
+                LandRecord.state == state if state is not None else None,
+                LandRecord.district == district if district is not None else None,
+                LandRecord.tehsil == tehsil if tehsil is not None else None,
+                LandRecord.village == village if village is not None else None,
+            )
+            if condition is not None
+        ]
+        if location_filters:
+            query = query.join(
+                LandRecord, Parcel.land_record_id == LandRecord.id
+            ).filter(*location_filters)
+
+        return query.all()
+
+    def get_by_land_record_id(self, record_id: int) -> list[Parcel]:
+        """Get all Parcels for a given LandRecord."""
+        return self.db.query(Parcel).filter(Parcel.land_record_id == record_id).all()
