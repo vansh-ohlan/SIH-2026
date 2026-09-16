@@ -118,7 +118,7 @@ body {
   fill-opacity: 0.14 !important;
 }
 
-/* Print Rules for Immutable Public Ledger Certificate */
+/* Print Rules for Tamper-Evident Public Ledger Certificate */
 @media print {
   header, footer, .no-print {
     display: none !important;

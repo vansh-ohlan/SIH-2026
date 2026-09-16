@@ -1,8 +1,25 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { extractOcr, submitOcrVerification } from "@/lib/api";
-import { OcrResult } from "@/lib/types";
+import { extractOcr, getDecisionSupport, postMutationDecision } from "@/lib/api";
+import { OcrResult, DecisionSupportReport, DecisionSupportFinding } from "@/lib/types";
+import {
+  FileCheck2,
+  ShieldCheck,
+  ShieldAlert,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  ArrowRight,
+  Copy,
+  Check,
+  Hash,
+  HelpCircle,
+  Loader2,
+  FileText,
+  Info,
+} from "lucide-react";
 
 type UploadStage = "idle" | "processing" | "verified" | "submitted";
 
@@ -15,18 +32,18 @@ interface StepInfo {
 const PIPELINE_STEPS: StepInfo[] = [
   {
     step: 1,
-    label: "Scanning layout anomalies...",
-    description: "Detecting document skew, seal locations, column boundaries, and handwriting noise",
+    label: "Scanning layout and resolution...",
+    description: "Detecting document skew, seal locations, column boundaries, and text clarity",
   },
   {
     step: 2,
-    label: "Extracting regional terminology...",
+    label: "Extracting regional RoR terminology...",
     description: "Parsing Khewat / Khatauni / Khasra numbers for Punjab, Patta / Chitta for Tamil Nadu",
   },
   {
     step: 3,
-    label: "Cross-referencing cadastral boundaries...",
-    description: "Reconciling extracted RoR area against georeferenced GIS survey polygon coordinates",
+    label: "Generating explainable decision support...",
+    description: "Reconciling extracted fields against PostGIS parcel database and cadastral survey geometry",
   },
 ];
 
@@ -41,20 +58,23 @@ export default function OcrUpload({
   const [dragActive, setDragActive] = useState<boolean>(false);
   const [fileDetails, setFileDetails] = useState<{ name: string; size: string } | null>(null);
   const [ocrData, setOcrData] = useState<OcrResult | null>(null);
+  const [decisionReport, setDecisionReport] = useState<DecisionSupportReport | null>(null);
   const [formData, setFormData] = useState<{
     owner: string;
     survey_no: string;
     area: number;
     khewat_no?: string;
     patta_no?: string;
-    notes?: string;
+    notes: string;
+    decision: "approved" | "rejected" | "needs_review";
   }>({
     owner: "",
     survey_no: "",
     area: 0,
     khewat_no: "",
     patta_no: "",
-    notes: "",
+    notes: "Verified extracted fields against ground survey and historical Jamabandi volume.",
+    decision: "needs_review",
   });
   const [auditReceipt, setAuditReceipt] = useState<{
     status: string;
@@ -64,11 +84,12 @@ export default function OcrUpload({
   } | null>(null);
   const [submittingAction, setSubmittingAction] = useState<boolean>(false);
   const [highlightedField, setHighlightedField] = useState<string | null>(null);
+  const [copiedHash, setCopiedHash] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Trigger simulated multi-step AI pipeline progression
+  // Trigger multi-step AI pipeline progression
   const runPipeline = async (
-    fileArg: File | { name: string; preset?: "punjab_jamabandi" | "tamil_nadu_patta" },
+    fileArg: File | { name: string; preset?: "punjab_jamabandi" | "tamil_nadu_patta" | "blurry_ror" | "owner_mismatch" },
     displayName: string,
     displaySize: string
   ) => {
@@ -78,31 +99,40 @@ export default function OcrUpload({
     setProgress(15);
 
     // Step 1: Scanning layout
-    await new Promise((r) => setTimeout(r, 650));
+    await new Promise((r) => setTimeout(r, 550));
     setCurrentStep(1);
     setProgress(45);
 
     // Step 2: Regional extraction
-    await new Promise((r) => setTimeout(r, 800));
-    setCurrentStep(2);
-    setProgress(80);
-
-    // Step 3: Cadastral cross-referencing & API extraction
-    const result = await extractOcr(fileArg);
     await new Promise((r) => setTimeout(r, 650));
+    setCurrentStep(2);
+    setProgress(75);
+
+    // Step 3: Cadastral cross-referencing & Decision Support
+    const result = await extractOcr(fileArg);
+    await new Promise((r) => setTimeout(r, 500));
     setCurrentStep(3);
     setProgress(100);
 
-    await new Promise((r) => setTimeout(r, 350));
+    await new Promise((r) => setTimeout(r, 300));
     if (result) {
       setOcrData(result);
+      const targetUlpid = result.ulpid || "PB-LDH-0042";
+
+      // Call decision support engine
+      const report = await getDecisionSupport(targetUlpid, result);
+      setDecisionReport(report);
+
       setFormData({
         owner: result.owner,
         survey_no: result.survey_no,
         area: result.area,
         khewat_no: result.khewat_no || "",
         patta_no: result.patta_no || "",
-        notes: "",
+        notes: report.anomalies.length > 0
+          ? `Discrepancy flagged: ${report.anomalies.map((a) => a.description).join("; ")}`
+          : "Verified against original Jamabandi register. No anomalies detected.",
+        decision: report.recommended_review_status === "approved_candidate" ? "approved" : "needs_review",
       });
       setStage("verified");
     } else {
@@ -140,27 +170,31 @@ export default function OcrUpload({
     }
   };
 
-  const handleVerificationDecision = async (decision: "confirmed" | "flagged_mismatch") => {
+  const handleOfficerSubmission = async () => {
     if (!ocrData) return;
     setSubmittingAction(true);
 
-    const receipt = await submitOcrVerification({
-      ulpid: ocrData.ulpid ?? "PB-LDH-0042",
-      decision,
-      officer_id: "OFF-102",
-      notes: formData.notes || (decision === "confirmed" ? "Verified via surveyor OCR pipeline" : "Area mismatch detected between RoR and Cadastre"),
-      extracted_data: {
-        ...ocrData,
-        owner: formData.owner,
-        survey_no: formData.survey_no,
-        area: formData.area,
-      },
-    });
+    try {
+      const targetUlpid = ocrData.ulpid || "PB-LDH-0042";
+      const receipt = await postMutationDecision(targetUlpid, {
+        decision: formData.decision,
+        officer_id: "OFF-102",
+        notes: formData.notes,
+      });
 
-    setSubmittingAction(false);
-    setAuditReceipt(receipt);
-    setStage("submitted");
-    onVerificationComplete?.(ocrData.ulpid ?? "PB-LDH-0042");
+      setAuditReceipt({
+        status: receipt.status,
+        audit_hash: receipt.audit_hash,
+        timestamp: receipt.timestamp,
+        action_summary: `Mutation decision (${formData.decision.toUpperCase().replace("_", " ")}) sealed in PostgreSQL ledger for ${targetUlpid}.`,
+      });
+      setStage("submitted");
+      onVerificationComplete?.(targetUlpid);
+    } catch (err: any) {
+      alert(`Error submitting mutation: ${err?.message || "Unknown error"}`);
+    } finally {
+      setSubmittingAction(false);
+    }
   };
 
   const resetUpload = () => {
@@ -169,8 +203,15 @@ export default function OcrUpload({
     setProgress(0);
     setFileDetails(null);
     setOcrData(null);
+    setDecisionReport(null);
     setAuditReceipt(null);
     setHighlightedField(null);
+  };
+
+  const copyHash = (hash: string) => {
+    navigator.clipboard.writeText(hash);
+    setCopiedHash(true);
+    setTimeout(() => setCopiedHash(false), 2000);
   };
 
   return (
@@ -186,13 +227,22 @@ export default function OcrUpload({
               OCR
             </div>
 
-            <h3 className="mt-4 font-serif text-2xl font-semibold text-ink">
-              AI Cadastral Document Ingestion
+            <div className="mt-4 flex items-center gap-2">
+              <span className="font-mono text-xs text-ochre-dark font-bold uppercase tracking-wider">
+                DOCUMENT INTELLIGENCE &amp; AI DECISION SUPPORT
+              </span>
+              <span className="rounded bg-ochre/20 px-2 py-0.5 text-[10px] font-mono font-bold text-ink">
+                Prototype OCR / Demo Processing
+              </span>
+            </div>
+
+            <h3 className="mt-2 font-serif text-2xl font-semibold text-ink">
+              Cadastral RoR Ingestion &amp; Verification Desk
             </h3>
-            <p className="mt-1 max-w-lg text-sm text-ink/70">
-              Drag and drop scanned Jamabandi, Patta/Chitta, or Sale Deeds.
-              The AI pipeline detects regional land formats, validates titleholders,
-              and cross-checks boundary extents against GIS cadastre layers.
+            <p className="mt-1 max-w-xl text-xs sm:text-sm text-ink/70">
+              Upload scanned Jamabandi, Patta/Chitta, or Deed records.
+              The pipeline extracts structured land parameters, reconciles against the PostGIS
+              database, and generates explainable anomaly decision support for the officer.
             </p>
 
             {/* Interactive Drop Box */}
@@ -221,40 +271,66 @@ export default function OcrUpload({
                   Click to browse or drop land document here
                 </span>
                 <span className="font-mono text-xs text-ink/50">
-                  Supports scanned PDF, PNG, JPG, or TIFF (up to 25 MB)
+                  Supports scanned PDF, PNG, JPG, or TIFF (Max 10 MB)
                 </span>
               </div>
             </div>
 
             {/* Quick Demo Pre-load Buttons */}
-            <div className="mt-6 flex flex-col sm:flex-row items-center gap-2.5">
+            <div className="mt-6 flex flex-col items-center gap-2">
               <span className="font-mono text-xs text-ink/50 uppercase tracking-wider">
-                Or load test records:
+                Or test with sample case fixtures:
               </span>
-              <button
-                onClick={() =>
-                  runPipeline(
-                    { name: "Punjab_Jamabandi_RoR_2026.pdf", preset: "punjab_jamabandi" },
-                    "Punjab_Jamabandi_RoR_2026.pdf",
-                    "420 KB"
-                  )
-                }
-                className="rounded-sm border border-ink/20 bg-parchment-dark/70 px-3 py-1.5 text-xs font-medium text-ink hover:bg-ink hover:text-parchment transition"
-              >
-                🌾 Punjab Jamabandi (Khasra 142/3)
-              </button>
-              <button
-                onClick={() =>
-                  runPipeline(
-                    { name: "TamilNadu_Patta_Chitta_84102.pdf", preset: "tamil_nadu_patta" },
-                    "TamilNadu_Patta_Chitta_84102.pdf",
-                    "385 KB"
-                  )
-                }
-                className="rounded-sm border border-ink/20 bg-parchment-dark/70 px-3 py-1.5 text-xs font-medium text-ink hover:bg-ink hover:text-parchment transition"
-              >
-                📜 Tamil Nadu Patta (Survey 284/1B)
-              </button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <button
+                  onClick={() =>
+                    runPipeline(
+                      { name: "Punjab_Jamabandi_PB-LDH-0042.pdf", preset: "punjab_jamabandi" },
+                      "Punjab_Jamabandi_PB-LDH-0042.pdf",
+                      "420 KB"
+                    )
+                  }
+                  className="rounded-sm border border-ink/20 bg-parchment-dark/70 px-3 py-1.5 text-xs font-medium text-ink hover:bg-ink hover:text-parchment transition"
+                >
+                  🌾 Punjab Jamabandi (Area Mismatch)
+                </button>
+                <button
+                  onClick={() =>
+                    runPipeline(
+                      { name: "Blurry_LowResolution_Scan.jpg", preset: "blurry_ror" },
+                      "Blurry_LowResolution_Scan.jpg",
+                      "290 KB"
+                    )
+                  }
+                  className="rounded-sm border border-amber-400 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-600 hover:text-white transition"
+                >
+                  ⚠️ Blurry Scan (&lt;0.60 Low Confidence)
+                </button>
+                <button
+                  onClick={() =>
+                    runPipeline(
+                      { name: "Mismatched_Owner_Deed.pdf", preset: "owner_mismatch" },
+                      "Mismatched_Owner_Deed.pdf",
+                      "350 KB"
+                    )
+                  }
+                  className="rounded-sm border border-brick/40 bg-brick/10 px-3 py-1.5 text-xs font-medium text-brick hover:bg-brick hover:text-white transition"
+                >
+                  ⚠️ Mismatched Titleholder
+                </button>
+                <button
+                  onClick={() =>
+                    runPipeline(
+                      { name: "TamilNadu_Patta_Chitta_84102.pdf", preset: "tamil_nadu_patta" },
+                      "TamilNadu_Patta_Chitta_84102.pdf",
+                      "385 KB"
+                    )
+                  }
+                  className="rounded-sm border border-ink/20 bg-parchment-dark/70 px-3 py-1.5 text-xs font-medium text-ink hover:bg-ink hover:text-parchment transition"
+                >
+                  📜 Tamil Nadu Patta (Clean Match)
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -270,7 +346,7 @@ export default function OcrUpload({
             <div className="flex items-center justify-between border-b border-ink/15 pb-4">
               <div>
                 <span className="font-mono text-xs text-ochre-dark uppercase font-bold tracking-wider">
-                  AI Extraction Engine Active
+                  Document Intelligence Active
                 </span>
                 <h4 className="font-serif text-xl font-semibold text-ink mt-0.5">
                   Analyzing {fileDetails?.name}
@@ -284,7 +360,7 @@ export default function OcrUpload({
             {/* Visual Animated Progress Bar */}
             <div className="mt-6">
               <div className="flex items-center justify-between text-xs font-mono text-ink/60 mb-1.5">
-                <span>Inference Pipeline</span>
+                <span>Inference &amp; Cross-Check Pipeline</span>
                 <span className="font-bold text-ink">{progress}%</span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-ink/10">
@@ -297,7 +373,7 @@ export default function OcrUpload({
 
             {/* Step-by-Step Progress Trackers */}
             <div className="mt-8 space-y-4">
-              {PIPELINE_STEPS.map((stepItem, idx) => {
+              {PIPELINE_STEPS.map((stepItem) => {
                 const isComplete = currentStep > stepItem.step;
                 const isCurrent = currentStep === stepItem.step;
 
@@ -345,23 +421,26 @@ export default function OcrUpload({
       )}
 
       {/* =================================================================== */}
-      {/* STAGE 3: Side-by-Side Verification Screen */}
+      {/* STAGE 3: Document Verification, Explainable Decision Support & Adjudication */}
       {/* =================================================================== */}
       {stage === "verified" && ocrData && (
-        <div className="plot-border bg-parchment shadow-[5px_5px_0_rgba(20,33,61,0.18)]">
+        <div className="plot-border bg-parchment shadow-[5px_5px_0_rgba(20,33,61,0.18)] space-y-0">
           {/* Top Status Bar */}
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-ink/15 bg-white/40 px-6 py-4">
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-mono text-xs text-ink/50">
-                  DOCUMENT VERIFICATION DESK
+                  OFFICER VERIFICATION DESK
                 </span>
                 <span className="rounded-full border border-land/50 bg-land/10 px-2.5 py-0.5 text-xs font-medium text-land">
-                  Parsed: {ocrData.record_type}
+                  Parsed: {ocrData.record_type || "Jamabandi (RoR)"}
+                </span>
+                <span className="rounded bg-ochre/20 px-2 py-0.5 text-[10px] font-mono font-bold text-ink">
+                  Rule-based prototype decision support
                 </span>
               </div>
               <h3 className="font-serif text-2xl font-semibold text-ink mt-0.5">
-                Review Extracted Record of Rights
+                Record of Rights Verification &amp; Statutory Adjudication
               </h3>
             </div>
 
@@ -370,276 +449,283 @@ export default function OcrUpload({
                 onClick={resetUpload}
                 className="rounded-sm border border-ink/20 px-3 py-1.5 text-xs font-medium text-ink hover:bg-ink/5 transition"
               >
-                ← Ingest Another
+                ← Ingest Another Document
               </button>
             </div>
           </div>
 
+          {/* Low vs Acceptable Confidence Banner */}
+          <div className="px-6 pt-5">
+            {ocrData.confidence < 0.60 ? (
+              <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-4 text-amber-950 flex items-start gap-3 shadow-sm">
+                <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-bold text-sm text-amber-900 flex items-center gap-2">
+                    <span>Manual verification required</span>
+                    <span className="bg-amber-200 text-amber-900 font-mono text-xs px-2 py-0.5 rounded">
+                      Confidence: {(ocrData.confidence * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-900/90 leading-relaxed">
+                    OCR extraction confidence is below 60.0% due to scan artifacts or resolution limits.
+                    The document is <strong>not automatically rejected</strong>; please review and correct the extracted values in the form below before statutory adjudication.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-land/40 bg-land/10 p-3.5 text-ink flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-land shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <div className="font-bold text-xs text-land flex items-center gap-2">
+                    <span>Extraction confidence acceptable for review</span>
+                    <span className="font-mono font-bold text-ink text-[11px]">
+                      ({(ocrData.confidence * 100).toFixed(1)}%)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-ink/70">
+                    Document quality is clear. AI provides advisory decision support; authorized government officers hold final legal authority.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Split Screen Container */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-ink/15">
+          <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-ink/15 p-6 gap-6 lg:gap-0">
             {/* ============================================================= */}
-            {/* LEFT SIDE: Stylized Land Document Preview with Bounding Boxes */}
+            {/* LEFT SIDE: Deed Preview & Structured Extracted Fields */}
             {/* ============================================================= */}
-            <div className="lg:col-span-6 p-6 sm:p-8 bg-parchment-dark/30 flex flex-col items-center justify-center">
-              <div className="w-full max-w-md">
+            <div className="lg:col-span-6 lg:pr-6 space-y-6">
+              <div>
                 <div className="flex items-center justify-between text-xs text-ink/60 mb-2">
-                  <span className="font-mono uppercase">Deed Canvas Preview</span>
-                  <span className="text-[11px]">Hover boxes to trace OCR field</span>
+                  <span className="font-mono uppercase font-semibold">1. Extracted Document Fields</span>
+                  <span className="text-[11px] font-mono">File: {fileDetails?.name}</span>
                 </div>
 
-                {/* Simulated Scanned Land Record Sheet */}
-                <div className="relative min-h-[460px] w-full rounded-sm bg-[#FAF8EE] p-6 shadow-md border border-ink/20 overflow-hidden font-serif">
-                  {/* Subtle paper watermark texture */}
-                  <div className="absolute inset-0 bg-grid-lines bg-grid opacity-20 pointer-events-none" />
-
-                  {/* Top Seal Stamp */}
-                  <div className="flex items-center justify-between border-b-2 border-ink/20 pb-4">
-                    <div className="text-left">
-                      <div className="text-[10px] uppercase font-mono tracking-widest text-ink/60">
-                        GOVERNMENT OF {ocrData.state?.toUpperCase() ?? "PUNJAB"}
-                      </div>
-                      <div className="text-sm font-bold text-ink tracking-tight">
-                        REVENUE &amp; LAND GOVERNANCE DEPT.
-                      </div>
-                      <div className="text-[10px] text-ink/70 font-mono">
-                        {ocrData.record_type}
-                      </div>
+                {/* Simulated Scanned Sheet */}
+                <div className="rounded-lg bg-[#FAF8EE] p-5 shadow-sm border border-ink/20 font-mono text-xs space-y-3">
+                  <div className="flex items-center justify-between border-b border-ink/15 pb-2">
+                    <div>
+                      <div className="text-[10px] uppercase text-ink/50 font-mono">Document Title</div>
+                      <div className="font-bold text-ink">{ocrData.record_type || "Jamabandi (RoR)"}</div>
                     </div>
-                    <div className="h-11 w-11 rounded-full survey-stamp flex items-center justify-center text-[10px] font-bold shrink-0">
-                      SEAL
+                    <div className="text-right">
+                      <div className="text-[10px] uppercase text-ink/50 font-mono">Target ULPID</div>
+                      <div className="font-bold text-ochre-dark">{ocrData.ulpid || "PB-LDH-0042"}</div>
                     </div>
                   </div>
 
-                  {/* Simulated Record Typography & OCR Overlays */}
-                  <div className="mt-4 space-y-4 text-xs text-ink/80 leading-relaxed font-mono">
-                    <div className="flex justify-between border-b border-ink/10 pb-1.5">
-                      <span className="text-ink/50">ULPIN LINKAGE:</span>
-                      <span className="font-bold text-ink">{ocrData.ulpid}</span>
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div className="bg-white/70 p-2.5 rounded border border-ink/10">
+                      <span className="text-ink/50 text-[10px] block">EXTRACTED OWNER:</span>
+                      <span className="font-bold text-ink text-xs">{formData.owner}</span>
                     </div>
-
-                    <div className="border-b border-ink/10 pb-1.5">
-                      <span className="text-ink/50 block text-[10px]">RECORD IDENTIFIER:</span>
-                      <span className="font-semibold text-ink">
-                        {ocrData.state === "Tamil Nadu"
-                          ? `Patta No: ${ocrData.patta_no} · ${ocrData.sub_division}`
-                          : `Khewat: ${ocrData.khewat_no} · Khatauni: ${ocrData.khatauni_no}`}
-                      </span>
+                    <div className="bg-white/70 p-2.5 rounded border border-ink/10">
+                      <span className="text-ink/50 text-[10px] block">SURVEY / KHASRA NO:</span>
+                      <span className="font-bold text-ink text-xs">{formData.survey_no || "N/A (Missing)"}</span>
                     </div>
-
-                    <div className="border-b border-ink/10 pb-1.5">
-                      <span className="text-ink/50 block text-[10px]">REGISTERED HOLDER / MALIK:</span>
-                      <span className="font-semibold text-ink">{formData.owner}</span>
+                    <div className="bg-white/70 p-2.5 rounded border border-ink/10">
+                      <span className="text-ink/50 text-[10px] block">EXTRACTED AREA:</span>
+                      <span className="font-bold text-ink text-xs">{formData.area.toLocaleString()} sqm</span>
                     </div>
-
-                    <div className="border-b border-ink/10 pb-1.5">
-                      <span className="text-ink/50 block text-[10px]">SURVEY / KHASRA NUMBER:</span>
-                      <span className="font-semibold text-ink">{formData.survey_no}</span>
-                    </div>
-
-                    <div className="border-b border-ink/10 pb-1.5">
-                      <span className="text-ink/50 block text-[10px]">DEED RECORDED EXTENT:</span>
-                      <span className="font-bold text-ink">
-                        {formData.area.toLocaleString()} sqm
-                      </span>
-                    </div>
-
-                    <div className="pt-2 text-[10px] text-ink/50 italic font-sans">
-                      Certified authentic copy verified by Revenue Officer Seal.
+                    <div className="bg-white/70 p-2.5 rounded border border-ink/10">
+                      <span className="text-ink/50 text-[10px] block">EXTRACTION CONFIDENCE:</span>
+                      <span className="font-bold text-ink text-xs">{(ocrData.confidence * 100).toFixed(1)}%</span>
                     </div>
                   </div>
+                </div>
+              </div>
 
-                  {/* Interactive Overlaid Bounding Boxes */}
-                  {ocrData.bounding_boxes?.map((box) => {
-                    const isHovered = highlightedField === box.field;
-                    return (
-                      <div
-                        key={box.field}
-                        onMouseEnter={() => setHighlightedField(box.field)}
-                        onMouseLeave={() => setHighlightedField(null)}
-                        style={{
-                          top: box.top,
-                          left: box.left,
-                          width: box.width,
-                          height: box.height,
-                        }}
-                        className={`absolute rounded border-2 transition-all cursor-pointer ${
-                          isHovered
-                            ? "border-ochre bg-ochre/25 shadow-lg scale-105 z-20"
-                            : "border-land/70 bg-land/10 hover:border-ochre z-10"
-                        }`}
-                      >
-                        <span className="absolute -top-3 left-1 rounded bg-ink px-1 font-mono text-[9px] text-parchment font-semibold">
-                          {box.label}: {(box.confidence * 100).toFixed(0)}%
-                        </span>
-                      </div>
-                    );
-                  })}
+              {/* Editable Form for Officer Verification */}
+              <div className="bg-white/60 p-5 rounded-lg border border-ink/15 space-y-4 text-xs">
+                <div className="font-bold text-ink text-xs uppercase font-mono flex items-center gap-1.5">
+                  <FileCheck2 className="w-4 h-4 text-ochre-dark" />
+                  <span>2. Verify / Correct Document Parameters</span>
                 </div>
 
-                <div className="mt-3 flex items-center justify-between text-[11px] text-ink/60 font-mono">
-                  <span>File: {fileDetails?.name}</span>
-                  <span>Confidence: {(ocrData.confidence * 100).toFixed(1)}%</span>
+                <div>
+                  <label className="block font-mono text-[11px] font-semibold text-ink/70 uppercase mb-1">
+                    Titleholder Name
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.owner}
+                    onChange={(e) => setFormData({ ...formData, owner: e.target.value })}
+                    className="w-full rounded bg-white p-2.5 plot-border text-ink font-medium text-xs focus:outline-none focus:border-ink"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-mono text-[11px] font-semibold text-ink/70 uppercase mb-1">
+                      Survey / Khasra No.
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.survey_no}
+                      onChange={(e) => setFormData({ ...formData, survey_no: e.target.value })}
+                      className="w-full rounded bg-white p-2.5 plot-border text-ink font-mono text-xs focus:outline-none focus:border-ink"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-mono text-[11px] font-semibold text-ink/70 uppercase mb-1">
+                      Stated Extent Area (sqm)
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.area}
+                      onChange={(e) => setFormData({ ...formData, area: Number(e.target.value) })}
+                      className="w-full rounded bg-white p-2.5 plot-border text-ink font-mono text-xs focus:outline-none focus:border-ink"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* ============================================================= */}
-            {/* RIGHT SIDE: Interactive Pre-Filled Form & Verification Desk */}
+            {/* RIGHT SIDE: Explainable Anomaly Cards & Statutory Adjudication */}
             {/* ============================================================= */}
-            <div className="lg:col-span-6 p-6 sm:p-8 flex flex-col justify-between">
-              <div>
-                {/* Confidence Meter Badge */}
-                <div className="flex items-center justify-between rounded bg-white/70 p-3 plot-border-solid mb-5">
-                  <div>
-                    <span className="text-[10px] font-mono uppercase text-ink/50">
-                      OCR Model Accuracy
-                    </span>
-                    <div className="font-serif text-lg font-bold text-ink flex items-center gap-2">
-                      <span>{(ocrData.confidence * 100).toFixed(1)}% Confidence</span>
-                      <span className="h-2 w-2 rounded-full bg-land" />
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] font-mono text-ink/50 uppercase block">
-                      Target Parcel
-                    </span>
-                    <span className="font-mono text-xs font-bold text-ink bg-parchment px-2 py-0.5 rounded border border-ink/20">
-                      {ocrData.ulpid}
-                    </span>
-                  </div>
+            <div className="lg:col-span-6 lg:pl-6 space-y-6">
+              {/* Explainable Decision Support Findings */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-xs uppercase font-semibold text-ink/70">
+                    3. Cross-Data Validation Findings
+                  </span>
+                  <span className="text-[10px] font-mono text-ink/50">
+                    {decisionReport?.anomalies.length || 0} Issue(s) Flagged
+                  </span>
                 </div>
 
-                {/* Cadastral Cross-Reference Analysis Banner */}
-                {ocrData.area_discrepancy_sqm && ocrData.area_discrepancy_sqm > 0 ? (
-                  <div className="rounded border-l-4 border-l-brick bg-brick/10 p-3 text-xs mb-5">
-                    <div className="font-bold text-brick flex items-center gap-1.5">
-                      <span>⚠️ Cadastral Area Discrepancy Detected</span>
-                    </div>
-                    <p className="mt-1 text-ink/80 leading-relaxed">
-                      Deed records <strong>{formData.area} sqm</strong>, but georeferenced GIS
-                      survey polygon measures <strong>{ocrData.cadastral_survey_area} sqm</strong>.
-                      Variance: <span className="font-bold text-brick">+{ocrData.area_discrepancy_sqm} sqm</span>.
-                    </p>
+                {decisionReport?.anomalies && decisionReport.anomalies.length > 0 ? (
+                  <div className="space-y-3">
+                    {decisionReport.anomalies.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-4 rounded-lg border text-xs space-y-2 ${
+                          item.severity === "high"
+                            ? "bg-brick/10 border-brick/30 text-brick-dark"
+                            : item.severity === "medium"
+                            ? "bg-amber-50 border-amber-300 text-amber-950"
+                            : "bg-ink/5 border-ink/20 text-ink"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs uppercase flex items-center gap-1.5">
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                            <span>{item.type.replace(/_/g, " ")}</span>
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              item.severity === "high"
+                                ? "bg-brick/20 text-brick"
+                                : item.severity === "medium"
+                                ? "bg-amber-200 text-amber-900 border border-amber-400"
+                                : "bg-ink/10 text-ink"
+                            }`}
+                          >
+                            Severity: {item.severity}
+                          </span>
+                        </div>
+
+                        <p className="font-medium leading-snug">{item.description}</p>
+
+                        {/* Explainability Breakdown */}
+                        <div className="pt-2 border-t border-ink/10 space-y-1 text-[11px] font-mono">
+                          <div>
+                            <strong className="text-ink/60 font-sans font-semibold">What was compared: </strong>
+                            <span>{item.what_compared}</span>
+                          </div>
+                          <div>
+                            <strong className="text-ink/60 font-sans font-semibold">What differs: </strong>
+                            <span className="font-bold">{item.what_differs}</span>
+                          </div>
+                          <div>
+                            <strong className="text-ink/60 font-sans font-semibold">Why flagged: </strong>
+                            <span className="text-ink/80 font-sans">{item.why_flagged}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
-                  <div className="rounded border-l-4 border-l-land bg-land/10 p-3 text-xs mb-5">
-                    <div className="font-bold text-land flex items-center gap-1.5">
-                      <span>✓ Exact Cadastral Alignment</span>
+                  <div className="bg-land/10 border border-land/30 rounded-lg p-4 text-xs text-land space-y-1">
+                    <div className="font-bold flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>All Cross-Data Checks Aligned</span>
                     </div>
-                    <p className="mt-1 text-ink/80 leading-relaxed">
-                      Deed area ({formData.area} sqm) aligns with digitized GIS polygon boundary.
+                    <p className="text-ink/75 text-[11px]">
+                      Document fields match official PostGIS registry and digitized cadastral survey extents.
                     </p>
                   </div>
                 )}
-
-                {/* Interactive Editable Form */}
-                <div className="space-y-4 text-xs">
-                  <div>
-                    <label className="block font-mono text-[11px] font-semibold text-ink/70 uppercase mb-1">
-                      Registered Owner / Pattadhar Name
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.owner}
-                      onChange={(e) => setFormData({ ...formData, owner: e.target.value })}
-                      className="w-full rounded-sm bg-white/80 p-2.5 plot-border text-ink font-medium text-sm outline-none focus:border-ink"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block font-mono text-[11px] font-semibold text-ink/70 uppercase mb-1">
-                        Survey / Khasra No.
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.survey_no}
-                        onChange={(e) => setFormData({ ...formData, survey_no: e.target.value })}
-                        className="w-full rounded-sm bg-white/80 p-2.5 plot-border text-ink font-mono text-sm outline-none focus:border-ink"
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-mono text-[11px] font-semibold text-ink/70 uppercase mb-1">
-                        Total Extracted Area (sqm)
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.area}
-                        onChange={(e) => setFormData({ ...formData, area: Number(e.target.value) })}
-                        className="w-full rounded-sm bg-white/80 p-2.5 plot-border text-ink font-mono text-sm outline-none focus:border-ink"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    {ocrData.state === "Tamil Nadu" ? (
-                      <div>
-                        <label className="block font-mono text-[11px] font-semibold text-ink/70 uppercase mb-1">
-                          Patta Number
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.patta_no}
-                          onChange={(e) => setFormData({ ...formData, patta_no: e.target.value })}
-                          className="w-full rounded-sm bg-white/80 p-2.5 plot-border text-ink font-mono text-sm outline-none focus:border-ink"
-                        />
-                      </div>
-                    ) : (
-                      <div>
-                        <label className="block font-mono text-[11px] font-semibold text-ink/70 uppercase mb-1">
-                          Khewat / Khatauni No.
-                        </label>
-                        <input
-                          type="text"
-                          value={formData.khewat_no}
-                          onChange={(e) => setFormData({ ...formData, khewat_no: e.target.value })}
-                          className="w-full rounded-sm bg-white/80 p-2.5 plot-border text-ink font-mono text-sm outline-none focus:border-ink"
-                        />
-                      </div>
-                    )}
-                    <div>
-                      <label className="block font-mono text-[11px] font-semibold text-ink/70 uppercase mb-1">
-                        Jurisdiction / State
-                      </label>
-                      <input
-                        type="text"
-                        disabled
-                        value={ocrData.state ?? "Punjab"}
-                        className="w-full rounded-sm bg-ink/5 p-2.5 plot-border text-ink/70 font-medium text-sm cursor-not-allowed"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block font-mono text-[11px] font-semibold text-ink/70 uppercase mb-1">
-                      Surveyor Verification Notes
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g., Verified against original Jamabandi register volume 24..."
-                      value={formData.notes}
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                      className="w-full rounded-sm bg-white/80 p-2.5 plot-border text-ink text-sm outline-none focus:border-ink placeholder:text-ink/40"
-                    />
-                  </div>
-                </div>
               </div>
 
-              {/* Action Buttons: Confirm & Sync vs Flag Mismatch */}
-              <div className="mt-8 pt-5 border-t border-ink/15 flex flex-col sm:flex-row gap-3">
+              {/* Statutory Adjudication Form */}
+              <div className="bg-white/70 p-5 rounded-lg border border-ink/20 space-y-4 text-xs">
+                <div className="font-bold text-ink text-xs uppercase font-mono flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-ochre-dark" />
+                  <span>4. Statutory Adjudication Determination</span>
+                </div>
+
+                {/* Decision Options */}
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "needs_review", label: "Needs Review", icon: Clock },
+                    { id: "approved", label: "Approve", icon: CheckCircle2 },
+                    { id: "rejected", label: "Reject", icon: XCircle },
+                  ].map((opt) => {
+                    const active = formData.decision === opt.id;
+                    const Icon = opt.icon;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, decision: opt.id as any })}
+                        className={`p-2.5 rounded border text-center transition-all flex flex-col items-center gap-1 ${
+                          active
+                            ? "bg-ink text-parchment border-ink font-bold shadow-sm"
+                            : "bg-parchment border-ink/20 text-ink hover:border-ink/50"
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        <span className="text-[11px]">{opt.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div>
+                  <label className="block font-mono text-[11px] font-semibold text-ink/70 uppercase mb-1">
+                    Officer Verification Notes (Mandatory)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    className="w-full rounded bg-white p-2.5 plot-border text-ink text-xs focus:outline-none focus:border-ink leading-relaxed"
+                    placeholder="Enter statutory verification findings..."
+                    required
+                  />
+                </div>
+
                 <button
+                  type="button"
                   disabled={submittingAction}
-                  onClick={() => handleVerificationDecision("confirmed")}
-                  className="flex-1 rounded-sm bg-land px-4 py-3 text-center text-sm font-semibold text-parchment hover:bg-land-light transition disabled:opacity-50 shadow"
+                  onClick={handleOfficerSubmission}
+                  className="w-full rounded-md bg-ink py-3 text-center text-xs font-bold text-parchment hover:bg-ink-light transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
                 >
-                  {submittingAction ? "Hashing & Syncing..." : "✓ Confirm & Sync to Cadastre"}
-                </button>
-                <button
-                  disabled={submittingAction}
-                  onClick={() => handleVerificationDecision("flagged_mismatch")}
-                  className="flex-1 rounded-sm border border-brick bg-brick/10 px-4 py-3 text-center text-sm font-semibold text-brick hover:bg-brick/20 transition disabled:opacity-50"
-                >
-                  {submittingAction ? "Hashing..." : "⚠️ Flag Mismatch to Officer Queue"}
+                  {submittingAction ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Recording Statutory Decision &amp; Hashing…</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-4 h-4 text-ochre" />
+                      <span>Submit Statutory Decision &amp; Seal SHA-256 Hash</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -652,46 +738,52 @@ export default function OcrUpload({
       {/* =================================================================== */}
       {stage === "submitted" && auditReceipt && (
         <div className="plot-border bg-parchment p-8 shadow-[5px_5px_0_rgba(20,33,61,0.18)]">
-          <div className="mx-auto max-w-xl text-center">
+          <div className="mx-auto max-w-xl text-center space-y-4">
             <div className="flex h-14 w-14 mx-auto items-center justify-center rounded-full bg-land/10 border-2 border-land text-land text-2xl font-bold">
               ✓
             </div>
 
-            <h3 className="font-serif text-2xl font-semibold text-ink mt-3">
+            <h3 className="font-serif text-2xl font-semibold text-ink">
               Tamper-Evident Audit Hash Committed
             </h3>
-            <p className="mt-1 text-sm text-ink/70">
+            <p className="text-xs text-ink/70">
               {auditReceipt.action_summary}
             </p>
 
             {/* Cryptographic Hash Card */}
-            <div className="mt-6 rounded-sm bg-ink p-5 text-left text-parchment font-mono text-xs shadow-inner space-y-2">
+            <div className="rounded-sm bg-ink p-5 text-left text-parchment font-mono text-xs shadow-inner space-y-2.5">
               <div className="flex items-center justify-between border-b border-parchment/15 pb-2 text-[11px] text-ochre">
                 <span>STATUS: {auditReceipt.status.toUpperCase()}</span>
                 <span>SHA-256 CHAINED PROVENANCE</span>
               </div>
               <div>
                 <span className="text-parchment/50 block text-[10px]">RECORD AUDIT HASH:</span>
-                <span className="font-bold text-ochre-light break-all select-all">
+                <span className="font-bold text-ochre-light break-all select-all font-mono">
                   {auditReceipt.audit_hash}
                 </span>
               </div>
               <div className="flex items-center justify-between text-[11px] text-parchment/60 pt-1">
                 <span>TIMESTAMP: {auditReceipt.timestamp}</span>
-                <span>SIGNER: OFF-102</span>
+                <button
+                  onClick={() => copyHash(auditReceipt.audit_hash)}
+                  className="text-ochre hover:underline flex items-center gap-1 font-mono text-[10px]"
+                >
+                  {copiedHash ? <Check className="w-3 h-3 text-land" /> : <Copy className="w-3 h-3" />}
+                  <span>{copiedHash ? "Copied" : "Copy Hash"}</span>
+                </button>
               </div>
             </div>
 
-            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
               <button
                 onClick={resetUpload}
-                className="w-full sm:w-auto rounded-sm bg-ink px-5 py-2.5 text-xs font-semibold text-parchment hover:bg-ink-light transition"
+                className="w-full sm:w-auto rounded bg-ink px-5 py-2.5 text-xs font-semibold text-parchment hover:bg-ink-light transition"
               >
                 Ingest Another Document
               </button>
               <a
-                href={`/parcel/${ocrData?.ulpid ?? "PB-LDH-0042"}`}
-                className="w-full sm:w-auto rounded-sm border border-ink/20 px-5 py-2.5 text-xs font-semibold text-ink hover:bg-ink/5 transition text-center"
+                href={`/citizen/parcel/${ocrData?.ulpid ?? "PB-LDH-0042"}`}
+                className="w-full sm:w-auto rounded border border-ink/20 px-5 py-2.5 text-xs font-semibold text-ink hover:bg-ink/5 transition text-center"
               >
                 Inspect Live Cadastral Deed Record →
               </a>

@@ -1,48 +1,60 @@
 # Bhu-Setu Backend Implementation Status
 
-**Current Branch**: `feature/backend-postgis`  
-**Current Milestone**: Stage 2 — PostgreSQL + PostGIS Persistence & Spatial Queries  
+**Current Branch**: `feature/stage4-parcel-gis-reconciliation`  
+**Current Milestone**: Stage 9 — Final Contract Correction, Claim Audit & Demo Freeze  
 **Integration Branch**: `dev`  
 
 ---
 
 ## 1. Completed
 
-- [x] **PostgreSQL Connection Pool**: Implemented connection pooling via `pg.Pool` supporting `DATABASE_URL` with health checking, query performance tracking, and graceful shutdown (`src/db/pool.ts`).
-- [x] **PostGIS Spatial Database Schema**:
-  - `parcels` table with `geometry(Polygon, 4326)`, owner info, tax data, RoR area, surveyed area, timestamps, unique ULPID constraint, and GiST spatial index.
-  - `mutations` table with parcel foreign key, decision constraints, and indexed audit trail.
-  - `schema_migrations` tracking table for repeatable versioning.
-- [x] **Database Migration Engine**: Repeatable SQL migration runner (`src/db/migrator.ts`) with migrations:
-  1. `001_enable_postgis.sql` (UUID & PostGIS extension initialization)
-  2. `002_create_parcels_table.sql` (Parcels table + GiST spatial index)
-  3. `003_create_mutations_table.sql` (Mutations table + constraints + indexes)
-- [x] **Deterministic Synthetic Seeder**: Seed runner (`src/db/seeder.ts`) populating demo parcels (`PB-LDH-0042`, `PB-LDH-0043`, `PB-LDH-0044`) using PostGIS `ST_SetSRID(ST_GeomFromGeoJSON(...), 4326)` and historical chained mutation records.
-- [x] **PostGIS Parcel Repository**: Spatial repository (`PostgisParcelRepository`) executing:
-  - `findByUlpid`: Parameterized SQL with JSON aggregation for mutations and `ST_AsGeoJSON(geometry)`.
-  - `search`: PostGIS `ST_Centroid(geometry)` returning `ST_X` (lng) and `ST_Y` (lat).
-  - `findConflictsByUlpid`: Rule-based area mismatch conflict detection (`ror_area_sqm` vs `surveyed_area_sqm`).
-  - `getAllGeoJson`: GeoJSON `FeatureCollection` generation with properties (`ulpid`, `land_use`).
-- [x] **PostGIS Mutation Repository**: Mutation repository (`PostgisMutationRepository`) with cryptographic SHA-256 hash chaining to previous database mutation records.
-- [x] **Docker Compose Environment**: Multi-platform `docker-compose.yml` configured for `postgis/postgis:16-3.4`.
-- [x] **Database CLI Scripts**: `npm run db:migrate`, `npm run db:seed`, `npm run db:reset`.
-- [x] **Health Check Integration**: `GET /api/health` queries database connectivity in background while preserving contract response `{"status": "ok"}`.
-- [x] **Comprehensive Test Suite**: 38 tests across 11 test suites passing with >86% coverage.
-- [x] **Zero Linter & Typecheck Warnings**: Clean TypeScript build and ESLint validation.
+- [x] **PostgreSQL Connection Pool & PostGIS Schema**: Implemented connection pooling via `pg.Pool`, `parcels` table with `geometry(Polygon, 4326)` and GiST spatial indexing, `mutations` table with SHA-256 hash chaining.
+- [x] **Database Migration Engine & Deterministic Seeder**: Versioned migration runner and seed runner populating multi-state pilot parcels (`PB-LDH-0042`, `PB-LDH-0043`, `PB-LDH-0044`, `CH-SEC-1701`, `TN-SPR-0814`).
+- [x] **OCR Pipeline Architecture (`OcrService`)**: Clean modular pipeline: Ingestion -> Input Validation -> Preprocessing -> OCR Engine -> Field Extraction & Normalization -> Confidence Scoring.
+- [x] **Frozen API Contract Fidelity**: Full fidelity with `docs/api-contracts.md` for `POST /api/ocr/extract` (`owner`, `area`, `survey_no`, `confidence` / 422 `unreadable_document` with exact message `OCR could not extract required fields`).
+- [x] **Multi-Source Adapters Architecture**:
+  - `StateLandRecordAdapter` for RoR/Jamabandi revenue registers.
+  - `BhuNakshaGisAdapter` for ground cadastral GIS polygons.
+  - `NgdrsRegistrationAdapter` for Sub-Registrar deed registrations and encumbrances.
+- [x] **Parcel-Centric Multi-Source Cross-Reconciliation (`ParcelReconciliationService`)**:
+  - Automated rule-based engine comparing RoR area vs GIS area, titleholder vs NGDRS registered party, survey numbers, and legal encumbrance statuses.
+  - Generates structured, explainable findings (`field_compared`, `source_a_value`, `source_b_value`, `difference`, `reason`, `severity`, `recommended_action`).
+  - Endpoint `GET /api/parcel/:ulpid/reconciliation`.
+- [x] **Stage 5 End-to-End Demo Workflow**:
+  - **Judge Demo Switcher Bar**: Rapid test cases across Punjab (`PB-LDH-0042`, `PB-LDH-0044`, `PB-LDH-0043`) and Chandigarh (`CH-SEC-1701`).
+  - **Unified Parcel Flow Banner (`UnifiedParcelFlow.tsx`)**: Visualizes 3 data adapter streams converging on atomic ULPIN anchor with variance metrics.
+  - **6-Category Reconciliation Summary Matrix**: Real-time cross-validation across Area, Survey, Owner, Deed, Encumbrance, and Master Plan.
+  - **5-Step Decision Lifecycle Timeline**: Transparent progression from citizen submission to tamper-evident sealed audit record.
+  - **Citizen Verification Request**: Interactive request modal with instant tracking receipt generation (`REQ-2026-PB-XXXX`).
+  - **Officer Mutation Adjudication Form**: Mandatory statutory findings log, confirmation safeguards, and SHA-256 audit receipt card with one-click copy.
+- [x] **Stage 6 Demo Hardening & Evidence Integrity**:
+  - **Claim Sanitization**: Removed unsupported statistics and absolute claims across UI and documentation; replaced with factual and technically accurate language.
+  - **Cryptographic Audit Verification (`verifyAuditHash`)**: Deterministic SHA-256 integrity verification helper function with full unit test coverage against tampered payloads.
+  - **Demo Data Consistency**: Audited and synchronized `PB-LDH-0042` (70 sqm / 5.6% variance) and `PB-LDH-0044` (consistent demo data across configured sources) across fixtures, services, and UI.
+  - **Demo Resilience & Safeguards**: Modal submission safety, clear `[DEMO / SYNTHETIC DATA]` labels, and robust error state handling.
+- [x] **Stage 7 Integration Validation & Canonical Hardening**:
+  - **Canonical Serialization**: Added `canonicalizeAuditPayload` with structured key-value serialization to eliminate delimiter ambiguity.
+  - **Edge-Case Hardening**: Validated 404 for non-existent ULPIDs, 400 for empty notes and malformed bodies, and 403 for unauthorized citizen mutation attempts.
+  - **Contract Preservation**: Preserved frozen OCR contract (`POST /api/ocr/extract`) and reconciliation contract (`GET /api/parcel/:ulpid/reconciliation`).
+  - **Static Code Review**: Complete static code audit and documentation of local environment status.
+- [x] **Stage 8 Final Judge Readiness & Claim Consistency**:
+  - **Audit Hash Canonicalization Hardening**: Structured deterministic key-value payload canonicalizer (`canonicalizeAuditPayload`) with full unit test verification in `backend/tests/unit/hashChain.test.ts`.
+  - **Repo-Wide Claim Sanitization**: Eradicated ungrounded terms (`immutable`, `non-repudiation`, `guaranteed`, `legally verified`, `100%`, `66%`), replaced with grounded public infrastructure terminology.
+  - **Demo Data Truthfulness & Consistency**: Unified `PB-LDH-0042` and `PB-LDH-0044` across backend fixtures, mock adapters, and frontend stores.
+- [x] **Stage 9 Final Contract Correction, Claim Audit & Demo Freeze**:
+  - **OCR Error Message Restoration**: Enforced exact frozen Stage 3 contract message `OCR could not extract required fields` everywhere.
+  - **Claim Audit & Demo Freeze**: Sanitized all frontend types, mock fixtures, officer mutation UI, and documentation. Published `docs/stage9-final-contract-and-demo-freeze.md`.
+  - **Truthful Environment Reporting**: Formally distinguished statically reviewed code vs runtime execution status.
+- [x] **Comprehensive Test Suites**: Unit and integration tests covering OCR, decision support, PostGIS spatial queries, parcel cross-reconciliation, RBAC enforcement, `verifyAuditHash`, `canonicalizeAuditPayload`, and Stage 5/6/7/8/9 governance workflows.
 
 ---
 
-## 2. Deferred to Stage 3 / 4
+## 2. Deferred to Future Milestones (National Federation & Scaling)
 
-- Real PaddleOCR Python microservice direct HTTP invocation (Stage 3).
-- GeoServer WFS/WMS live vector tile sync (Stage 3).
-- Real government registry legacy connectors (Stage 3/4).
-- Production authentication system (mock authentication remains sufficient for Phase 1-3 demo).
+- GeoServer WFS/WMS live vector tile sync.
+- Real production government API endpoints (live state NIC/Bhulekh web services).
+- MeriPehchaan (National SSO) production OAuth integration.
 
----
 
-## 3. Next Stage (Stage 3 Roadmap)
 
-1. **AI/ML Service Bridge**: Connect `OcrService` to the Python FastAPI microservice in `ai_ml/` for live RoR document extraction.
-2. **GeoServer Layer Sync**: Integrate vector tile / GeoJSON feeds with GeoServer for interactive map rendering.
-3. **Officer Mutation Review Queue**: Real-time review workflow and audit hash ledger validation.
+

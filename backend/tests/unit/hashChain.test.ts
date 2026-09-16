@@ -1,6 +1,22 @@
-import { generateAuditHash, GENESIS_HASH } from '../../src/audit/hashChain';
+import { generateAuditHash, verifyAuditHash, canonicalizeAuditPayload, GENESIS_HASH } from '../../src/audit/hashChain';
 
 describe('Audit Hash Chain Generator', () => {
+  it('should generate deterministic canonical serialization with structured key labels', () => {
+    const input = {
+      ulpid: 'PB-LDH-0042',
+      decision: 'approved' as const,
+      officer_id: 'OFF-102',
+      notes: '  Verified against original survey map  ',
+      timestamp: '2026-09-08T10:15:00Z',
+      previous_hash: GENESIS_HASH
+    };
+
+    const canonical = canonicalizeAuditPayload(input);
+    expect(canonical).toBe(
+      `prev:${GENESIS_HASH}|ulpid:PB-LDH-0042|dec:approved|off:OFF-102|notes:Verified against original survey map|ts:2026-09-08T10:15:00Z`
+    );
+  });
+
   it('should generate a deterministic SHA-256 hash for given inputs', () => {
     const input = {
       ulpid: 'PB-LDH-0042',
@@ -49,5 +65,55 @@ describe('Audit Hash Chain Generator', () => {
     expect(hashChangedDecision).not.toEqual(hashOriginal);
     expect(hashChangedOfficer).not.toEqual(hashOriginal);
     expect(hashChangedPrev).not.toEqual(hashOriginal);
+  });
+
+  describe('verifyAuditHash (Tamper-Evident Verification)', () => {
+    const baseRecord = {
+      ulpid: 'PB-LDH-0042',
+      decision: 'approved' as const,
+      officer_id: 'OFF-102',
+      notes: 'Verified against original survey map',
+      timestamp: '2026-09-08T10:15:00Z',
+      previous_hash: GENESIS_HASH,
+      audit_hash: ''
+    };
+
+    beforeEach(() => {
+      baseRecord.audit_hash = generateAuditHash(baseRecord);
+    });
+
+    it('should return true for an untampered audit record', () => {
+      expect(verifyAuditHash(baseRecord)).toBe(true);
+    });
+
+    it('should return false if notes were modified', () => {
+      const tampered = { ...baseRecord, notes: 'Tampered notes altering survey finding' };
+      expect(verifyAuditHash(tampered)).toBe(false);
+    });
+
+    it('should return false if decision was modified', () => {
+      const tampered = { ...baseRecord, decision: 'rejected' as const };
+      expect(verifyAuditHash(tampered)).toBe(false);
+    });
+
+    it('should return false if officer ID was modified', () => {
+      const tampered = { ...baseRecord, officer_id: 'OFF-999' };
+      expect(verifyAuditHash(tampered)).toBe(false);
+    });
+
+    it('should return false if previous hash chain link was modified', () => {
+      const tampered = { ...baseRecord, previous_hash: 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890' };
+      expect(verifyAuditHash(tampered)).toBe(false);
+    });
+
+    it('should return false if timestamp was altered', () => {
+      const tampered = { ...baseRecord, timestamp: '2026-09-08T11:00:00Z' };
+      expect(verifyAuditHash(tampered)).toBe(false);
+    });
+
+    it('should return false if audit_hash is missing or invalid', () => {
+      expect(verifyAuditHash({ ...baseRecord, audit_hash: '' })).toBe(false);
+      expect(verifyAuditHash({ ...baseRecord, audit_hash: 'invalidhash' })).toBe(false);
+    });
   });
 });

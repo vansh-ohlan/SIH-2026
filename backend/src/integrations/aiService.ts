@@ -1,12 +1,27 @@
 import { config } from '../config';
-import { OcrExtractionResponse } from '../models/ocr';
+import { OcrExtractionResponse, DecisionSupportReport, DecisionSupportFinding } from '../models/ocr';
+import { ocrService } from '../services/ocrService';
+import { decisionSupportService } from '../services/decisionSupportService';
 import { logger } from '../utils/logger';
 
 /**
- * Interface for communicating with the AI/ML microservice (FastAPI / PaddleOCR).
+ * Interface for AI/ML service boundaries and decision support layer.
+ * Allows a future live ML microservice (e.g. FastAPI + PaddleOCR + Isolation Forest)
+ * to seamlessly plug in while maintaining deterministic fallback.
  */
 export interface IAiServiceClient {
   extractDocument(fileBuffer: Buffer, fileName: string): Promise<OcrExtractionResponse>;
+  analyzeDocument(fileBuffer: Buffer, fileName: string): Promise<OcrExtractionResponse>;
+  detectAnomalies(
+    ocrData: OcrExtractionResponse,
+    storedParcel: {
+      owner_name: string;
+      ror_area_sqm: number;
+      surveyed_area_sqm: number;
+      land_use: string;
+    } | null
+  ): DecisionSupportFinding[];
+  generateDecisionSupport(ulpid: string, ocrData: OcrExtractionResponse): Promise<DecisionSupportReport>;
 }
 
 export class AiServiceClient implements IAiServiceClient {
@@ -16,17 +31,34 @@ export class AiServiceClient implements IAiServiceClient {
     this.serviceUrl = serviceUrl;
   }
 
-  public async extractDocument(_fileBuffer: Buffer, fileName: string): Promise<OcrExtractionResponse> {
-    logger.info(`Forwarding OCR extraction request to AI/ML service at ${this.serviceUrl}`, { fileName });
+  public async extractDocument(fileBuffer: Buffer, fileName: string): Promise<OcrExtractionResponse> {
+    logger.info(`Extracting document fields via OCR pipeline service (target AI URL: ${this.serviceUrl})`, { fileName });
+    return ocrService.extractFromDocument(fileBuffer, fileName);
+  }
 
-    // Stage 1 stub: Return synthetic extracted document data matching api contracts
-    return {
-      owner: 'Suresh Singh',
-      area: 980,
-      survey_no: '142/3',
-      confidence: 0.87
-    };
+  public async analyzeDocument(fileBuffer: Buffer, fileName: string): Promise<OcrExtractionResponse> {
+    return this.extractDocument(fileBuffer, fileName);
+  }
+
+  public detectAnomalies(
+    ocrData: OcrExtractionResponse,
+    storedParcel: {
+      owner_name: string;
+      ror_area_sqm: number;
+      surveyed_area_sqm: number;
+      land_use: string;
+    } | null
+  ): DecisionSupportFinding[] {
+    return decisionSupportService.detectAnomalies(ocrData, storedParcel);
+  }
+
+  public async generateDecisionSupport(
+    ulpid: string,
+    ocrData: OcrExtractionResponse
+  ): Promise<DecisionSupportReport> {
+    return decisionSupportService.generateDecisionSupport(ulpid, ocrData);
   }
 }
 
 export const aiServiceClient = new AiServiceClient();
+

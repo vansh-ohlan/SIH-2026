@@ -40,7 +40,7 @@ export default function CitizenPortalPage() {
       district: "Ludhiana, Punjab",
       taxStatus: "✓ Tax Paid",
       taxPaid: true,
-      status: "Potential Area Mismatch",
+      status: "Conflict Detected",
       statusType: "warning",
       notes: "RoR area (1,250 sqm) differs from Surveyed area (1,180 sqm)",
     },
@@ -53,7 +53,7 @@ export default function CitizenPortalPage() {
       district: "Ludhiana, Punjab",
       taxStatus: "⚠ Dues: ₹3,200",
       taxPaid: false,
-      status: "Tax Arrears Flagged",
+      status: "Needs Verification",
       statusType: "warning",
       notes: "Boundary clear · Property tax assessment notice pending",
     },
@@ -66,7 +66,7 @@ export default function CitizenPortalPage() {
       district: "Sector 17, Chandigarh",
       taxStatus: "✓ Tax Paid",
       taxPaid: true,
-      status: "Verified Clear",
+      status: "Verified",
       statusType: "success",
       notes: "Municipal tax current · Survey boundaries reconciled",
     },
@@ -79,11 +79,12 @@ export default function CitizenPortalPage() {
       district: "Sriperumbudur, Tamil Nadu",
       taxStatus: "⚠ Dues: ₹4,800",
       taxPaid: false,
-      status: "Verified Clear",
+      status: "Verified",
       statusType: "success",
       notes: "Patta / Chitta synchronized with cadastral survey",
     },
   ];
+
 
   return (
     <main className="min-h-screen bg-parchment flex flex-col justify-between">
