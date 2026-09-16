@@ -29,6 +29,8 @@ export interface ParcelRecord {
   land_use: string;
   tax_status: TaxStatus;
   mutations: MutationHistoryItem[];
+  ror_area_sqm?: number;
+  surveyed_area_sqm?: number;
 }
 
 export interface ParcelSearchResult {
