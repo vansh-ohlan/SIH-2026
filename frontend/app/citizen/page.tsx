@@ -16,7 +16,9 @@ import {
   Building,
   Info,
   CheckCircle2,
+  Sparkles,
 } from "lucide-react";
+import { getParcelRiskAnalysis } from "@/lib/risk/mockRiskData";
 
 const MapView = dynamic(() => import("@/components/MapView"), {
   ssr: false,
@@ -132,53 +134,63 @@ export default function CitizenPortalPage() {
             </div>
 
             <div className="space-y-3">
-              {sampleParcels.map((parcel) => (
-                <Link
-                  key={parcel.ulpid}
-                  href={`/citizen/parcel/${parcel.ulpid}`}
-                  className="block bg-parchment p-4 rounded-lg plot-border hover:shadow-md transition-all group"
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono font-bold text-sm text-ink group-hover:text-ochre-dark transition-colors">
-                          {parcel.ulpid}
-                        </span>
-                        <span
-                          className={`text-[10px] px-2 py-0.5 rounded font-semibold border ${
-                            parcel.statusType === "warning"
-                              ? "bg-amber-100 text-amber-900 border-amber-300"
-                              : "bg-land/20 text-land border-land/30"
-                          }`}
-                        >
-                          {parcel.status}
-                        </span>
-                        <span
-                          className={`text-[10px] px-2 py-0.5 rounded font-medium ${
-                            parcel.taxPaid ? "bg-land/10 text-land" : "bg-brick/10 text-brick"
-                          }`}
-                        >
-                          {parcel.taxStatus}
-                        </span>
-                      </div>
-                      <div className="text-xs font-bold text-ink/90 mt-1.5">
-                        {parcel.owner} · <span className="text-ink/60 font-normal">Registered since {parcel.since}</span>
-                      </div>
-                      <div className="text-xs text-ink/60 mt-0.5">
-                        {parcel.district} · {parcel.area} · {parcel.landUse}
-                      </div>
-                    </div>
-                    <div className="text-ink group-hover:translate-x-1 transition-transform pt-1">
-                      <ArrowRight className="w-4 h-4" />
-                    </div>
-                  </div>
+              {sampleParcels.map((parcel) => {
+                const risk = getParcelRiskAnalysis(parcel.ulpid);
+                const isHigh = risk.level === "HIGH";
+                const isMod = risk.level === "MODERATE";
 
-                  <div className="mt-3 pt-2 border-t border-ink/10 text-[11px] text-ink/70 flex items-center gap-1.5">
-                    <Info className="w-3.5 h-3.5 text-ochre-dark shrink-0" />
-                    <span className="truncate">{parcel.notes}</span>
-                  </div>
-                </Link>
-              ))}
+                return (
+                  <Link
+                    key={parcel.ulpid}
+                    href={`/citizen/parcel/${parcel.ulpid}`}
+                    className="block bg-parchment p-4 rounded-lg plot-border hover:shadow-md transition-all group"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono font-bold text-sm text-ink group-hover:text-ochre-dark transition-colors">
+                            {parcel.ulpid}
+                          </span>
+                          <span
+                            className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
+                              isHigh
+                                ? "bg-red-100 text-red-950 border-red-300"
+                                : isMod
+                                ? "bg-amber-100 text-amber-950 border-amber-300"
+                                : "bg-emerald-100 text-emerald-950 border-emerald-300"
+                            }`}
+                          >
+                            🛡️ {risk.score}/100 {risk.level}
+                          </span>
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded font-semibold border ${
+                              parcel.statusType === "warning"
+                                ? "bg-amber-100 text-amber-900 border-amber-300"
+                                : "bg-land/20 text-land border-land/30"
+                            }`}
+                          >
+                            {parcel.status}
+                          </span>
+                        </div>
+                        <div className="text-xs font-bold text-ink/90 mt-1.5">
+                          {parcel.owner} · <span className="text-ink/60 font-normal">Registered since {parcel.since}</span>
+                        </div>
+                        <div className="text-xs text-ink/60 mt-0.5">
+                          {parcel.district} · {parcel.area} · {parcel.landUse}
+                        </div>
+                      </div>
+                      <div className="text-ink group-hover:translate-x-1 transition-transform pt-1">
+                        <ArrowRight className="w-4 h-4" />
+                      </div>
+                    </div>
+
+                    <div className="mt-3 pt-2 border-t border-ink/10 text-[11px] text-ink/70 flex items-center gap-1.5">
+                      <Info className="w-3.5 h-3.5 text-ochre-dark shrink-0" />
+                      <span className="truncate">{parcel.notes}</span>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           </div>
 

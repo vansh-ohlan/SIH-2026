@@ -229,8 +229,70 @@ export async function seedDatabase(): Promise<void> {
       }
     }
 
+    // Seed Encroachment Alerts
+    const encroachmentAlerts = [
+      {
+        id: "ENC-PB-001", ulpid: "PB-LDH-0043", region_id: "punjab", confidence: 0.94,
+        description: "Satellite Change Detection: Unauthorized 65 sqm plinth construction encroaching on village access pathway",
+        area_sqm: 65, detected_date: "2026-09-02", severity: "high", type: "unauthorized_construction",
+        geometry: { type: "Polygon", coordinates: [[[75.867, 30.905], [75.871, 30.905], [75.871, 30.909], [75.867, 30.909], [75.867, 30.905]]] }
+      },
+      {
+        id: "ENC-PB-002", ulpid: "PB-LDH-0042", region_id: "punjab", confidence: 0.88,
+        description: "Multi-temporal NDVI shift: Unapproved boundary expansion into public drainage buffer zone",
+        area_sqm: 42, detected_date: "2026-08-25", severity: "medium", type: "boundary_push",
+        geometry: { type: "Polygon", coordinates: [[[75.857, 30.907], [75.860, 30.907], [75.860, 30.910], [75.857, 30.910], [75.857, 30.907]]] }
+      }
+    ];
+
+    for (const alert of encroachmentAlerts) {
+      await client.query(
+        `
+        INSERT INTO encroachment_alerts (
+          id, ulpid, region_id, confidence, description, area_sqm, detected_date, severity, type, geometry
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, ST_SetSRID(ST_GeomFromGeoJSON($10), 4326)
+        )
+        ON CONFLICT (id) DO NOTHING;
+        `,
+        [alert.id, alert.ulpid, alert.region_id, alert.confidence, alert.description, alert.area_sqm, alert.detected_date, alert.severity, alert.type, JSON.stringify(alert.geometry)]
+      );
+    }
+
+    // Seed Utility Lines
+    const utilityLines = [
+      {
+        id: "UTL-PB-PWR", region_id: "punjab", name: "66kV High Tension Power Corridor", type: "power_grid",
+        specification: "66kV Double Circuit Overhead Grid (15m Statutory No-Build Safety Zone)", voltage_or_flow: "66kV / 400 Ampere",
+        safety_buffer_meters: 15,
+        geometry: { type: "LineString", coordinates: [[75.838, 30.895], [75.852, 30.902], [75.862, 30.908], [75.874, 30.916]] },
+        buffer_geometry: { type: "Polygon", coordinates: [[[75.836, 30.896], [75.850, 30.903], [75.860, 30.909], [75.872, 30.917], [75.876, 30.915], [75.864, 30.907], [75.854, 30.901], [75.840, 30.894], [75.836, 30.896]]] }
+      },
+      {
+        id: "UTL-PB-WTR", region_id: "punjab", name: "Ludhiana Municipal Water Supply Trunk", type: "water_main",
+        specification: "900mm Ductile Iron Potable Transmission Duct", voltage_or_flow: "900mm Ø · 4.2 Bar Pressure",
+        safety_buffer_meters: 5,
+        geometry: { type: "LineString", coordinates: [[75.845, 30.898], [75.856, 30.905], [75.865, 30.912]] },
+        buffer_geometry: null
+      }
+    ];
+
+    for (const line of utilityLines) {
+      await client.query(
+        `
+        INSERT INTO utility_lines (
+          id, region_id, name, type, specification, voltage_or_flow, safety_buffer_meters, geometry, buffer_geometry
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, ST_SetSRID(ST_GeomFromGeoJSON($8), 4326), $9::geometry
+        )
+        ON CONFLICT (id) DO NOTHING;
+        `,
+        [line.id, line.region_id, line.name, line.type, line.specification, line.voltage_or_flow, line.safety_buffer_meters, JSON.stringify(line.geometry), line.buffer_geometry ? JSON.stringify(line.buffer_geometry) : null]
+      );
+    }
+
     await client.query('COMMIT');
-    logger.info(`Successfully seeded ${SYNTHETIC_SEED_PARCELS.length} demo parcels with mutations.`);
+    logger.info(`Successfully seeded ${SYNTHETIC_SEED_PARCELS.length} demo parcels with mutations, and additional GIS layers.`);
   } catch (error) {
     await client.query('ROLLBACK');
     logger.error('Failed to seed database', { error: (error as Error).message });

@@ -191,6 +191,10 @@ export async function getMapParcelsByRegion(
 export async function getEncroachmentAlerts(
   regionId?: RegionId
 ): Promise<EncroachmentAlert[]> {
+  const query = regionId ? `?type=encroachments&region=${regionId}` : `?type=encroachments`;
+  const { data } = await tryFetch<EncroachmentAlert[]>(`/map/layers${query}`);
+  if (data) return data;
+
   await sleep(100);
   if (!regionId) return MOCK_ENCROACHMENT_ALERTS;
   return MOCK_ENCROACHMENT_ALERTS.filter((a) => a.region_id === regionId);
@@ -199,6 +203,10 @@ export async function getEncroachmentAlerts(
 export async function getUtilityLines(
   regionId?: RegionId
 ): Promise<UtilityLine[]> {
+  const query = regionId ? `?type=utilities&region=${regionId}` : `?type=utilities`;
+  const { data } = await tryFetch<UtilityLine[]>(`/map/layers${query}`);
+  if (data) return data;
+
   await sleep(100);
   if (!regionId) return MOCK_UTILITIES;
   return MOCK_UTILITIES.filter((u) => u.region_id === regionId);

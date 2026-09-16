@@ -1,10 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import OfficerSidebar from "@/components/OfficerSidebar";
 import ConflictBadge from "@/components/ConflictBadge";
 import { useAuth } from "@/lib/authContext";
+import { getAllParcelRiskAnalyses } from "@/lib/risk/mockRiskData";
+import { RiskAnalysis } from "@/lib/risk/riskTypes";
+import RiskAnalysisModal from "@/components/risk/RiskAnalysisModal";
 import {
   ShieldAlert,
   FileCheck2,
@@ -17,18 +21,36 @@ import {
   History,
   Lock,
   Target,
+  Sparkles,
+  ExternalLink,
+  Filter,
 } from "lucide-react";
 
 export default function OfficerDashboard() {
   const { user, role, hasRole } = useAuth();
-
   const isOfficer = hasRole(["revenue_officer", "registrar", "admin"]);
+
+  // Risk analyses dataset & modal state
+  const allAnalyses = getAllParcelRiskAnalyses();
+  const [selectedRiskAnalysis, setSelectedRiskAnalysis] = useState<RiskAnalysis | null>(null);
+  const [isRiskModalOpen, setIsRiskModalOpen] = useState<boolean>(false);
+  const [riskFilter, setRiskFilter] = useState<string>("all");
+
+  const highRiskCount = allAnalyses.filter((a) => a.level === "HIGH").length;
+
+  const filteredRisks = allAnalyses.filter((item) => {
+    if (riskFilter === "all") return true;
+    if (riskFilter === "HIGH") return item.level === "HIGH";
+    if (riskFilter === "MODERATE") return item.level === "MODERATE";
+    if (riskFilter === "LOW") return item.level === "LOW";
+    return true;
+  });
 
   const stats = [
     { label: "Total Georeferenced Parcels", value: "10", sub: "Ludhiana Cadastral Pilot", icon: Layers, color: "text-ink" },
-    { label: "Flagged Inconsistencies", value: "1", sub: "PB-LDH-0042 (Medium)", icon: ShieldAlert, color: "text-amber-800" },
+    { label: "High-Risk Due-Diligence", value: `${highRiskCount}`, sub: "Elevated Risk Flags", icon: ShieldAlert, color: "text-red-700" },
+    { label: "Flagged Inconsistencies", value: "1", sub: "PB-LDH-0042 (Medium)", icon: AlertTriangle, color: "text-amber-800" },
     { label: "Pending Mutation Reviews", value: "1", sub: "Requires Field Review", icon: FileCheck2, color: "text-ochre-dark" },
-    { label: "Chained Audit Records", value: "8", sub: "SHA-256 Chained", icon: CheckCircle2, color: "text-land" },
   ];
 
   const recentMutations = [
@@ -78,7 +100,7 @@ export default function OfficerDashboard() {
                 Land Governance Officer Hub
               </h1>
               <p className="text-xs text-ink/70 mt-1">
-                Spatial discrepancy reconciliation, automated inconsistency flags, and tamper-evident mutation adjudication.
+                Spatial discrepancy reconciliation, AI due-diligence risk scoring, and tamper-evident mutation adjudication.
               </p>
             </div>
 
@@ -123,6 +145,148 @@ export default function OfficerDashboard() {
                 </div>
               );
             })}
+          </div>
+
+          {/* ================================================================ */}
+          {/* HIGH-RISK PARCELS & DUE-DILIGENCE QUEUE TABLE (Requirement 13)    */}
+          {/* ================================================================ */}
+          <div className="bg-parchment p-5 sm:p-6 rounded-xl plot-border shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="font-serif text-lg font-bold text-ink flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-ochre-dark" />
+                  <span>AI Land Risk &amp; Due-Diligence Queue</span>
+                </h2>
+                <p className="text-xs text-ink/60 mt-0.5">
+                  Multi-departmental automated screening for encumbrances, litigation, zoning, and satellite anomalies.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Risk Filters */}
+                <div className="flex items-center gap-1 bg-ink/5 p-1 rounded-lg text-xs">
+                  <Filter className="w-3 h-3 text-ink/50 ml-1" />
+                  {["all", "HIGH", "MODERATE", "LOW"].map((flt) => (
+                    <button
+                      key={flt}
+                      onClick={() => setRiskFilter(flt)}
+                      className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
+                        riskFilter === flt
+                          ? "bg-ink text-parchment font-bold"
+                          : "text-ink/70 hover:text-ink"
+                      }`}
+                    >
+                      {flt === "all" ? "All" : flt === "HIGH" ? "🔴 High" : flt === "MODERATE" ? "🟠 Mod" : "🟢 Low"}
+                    </button>
+                  ))}
+                </div>
+
+                <Link
+                  href="/officer/risk"
+                  className="text-xs font-bold text-ink hover:text-ochre-dark flex items-center gap-1 bg-ochre/15 px-3 py-1.5 rounded"
+                >
+                  <span>Full Workbench</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-ink/15 text-ink/50 font-mono text-[11px] uppercase bg-parchment-dark/20">
+                    <th className="py-2.5 px-3">Parcel</th>
+                    <th className="py-2.5 px-3">Risk Score</th>
+                    <th className="py-2.5 px-3">Main Issue / Risk Drivers</th>
+                    <th className="py-2.5 px-3">Status</th>
+                    <th className="py-2.5 px-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-ink/10">
+                  {filteredRisks.map((item) => {
+                    const isHigh = item.level === "HIGH";
+                    const isMod = item.level === "MODERATE";
+
+                    return (
+                      <tr
+                        key={item.ulpid}
+                        className={`hover:bg-ink/5 transition-colors ${
+                          isHigh ? "bg-red-50/30" : isMod ? "bg-amber-50/20" : ""
+                        }`}
+                      >
+                        <td className="py-2.5 px-3">
+                          <div className="font-mono font-bold text-ink">
+                            {item.ulpid}
+                          </div>
+                          <div className="text-ink/70 text-[11px]">
+                            {item.ownerName} · {item.district}
+                          </div>
+                        </td>
+
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={`px-2 py-0.5 rounded font-mono text-[11px] font-bold border ${
+                              isHigh
+                                ? "bg-red-100 text-red-950 border-red-300"
+                                : isMod
+                                ? "bg-amber-100 text-amber-950 border-amber-300"
+                                : "bg-emerald-100 text-emerald-950 border-emerald-300"
+                            }`}
+                          >
+                            {item.score} {item.level}
+                          </span>
+                        </td>
+
+                        <td className="py-2.5 px-3 text-ink/80">
+                          {item.topDrivers.length > 0 ? (
+                            <span>
+                              {item.topDrivers.slice(0, 2).map((d) => d.label).join(" + ")}
+                            </span>
+                          ) : (
+                            <span className="text-emerald-700">None significant</span>
+                          )}
+                        </td>
+
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              isHigh
+                                ? "bg-red-200 text-red-900"
+                                : isMod
+                                ? "bg-amber-100 text-amber-900 border border-amber-300"
+                                : "bg-emerald-100 text-emerald-900"
+                            }`}
+                          >
+                            {isHigh ? "Review" : isMod ? "Pending" : "Clear"}
+                          </span>
+                        </td>
+
+                        <td className="py-2.5 px-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => {
+                                setSelectedRiskAnalysis(item);
+                                setIsRiskModalOpen(true);
+                              }}
+                              className="bg-ochre-dark text-parchment px-2.5 py-1 rounded text-[11px] font-bold hover:bg-ochre-dark/90 transition-all flex items-center gap-1 shadow-xs"
+                            >
+                              <Sparkles className="w-3 h-3" />
+                              <span>Inspect</span>
+                            </button>
+                            <Link
+                              href={`/citizen/parcel/${item.ulpid}`}
+                              className="border border-ink/20 px-2 py-1 rounded text-[11px] font-semibold text-ink hover:bg-ink hover:text-parchment transition-all"
+                            >
+                              View
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Priority Inconsistency / Conflict Review Queue: PB-LDH-0042 Hero Case */}
@@ -250,6 +414,13 @@ export default function OfficerDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Risk Dossier Modal */}
+      <RiskAnalysisModal
+        analysis={selectedRiskAnalysis}
+        isOpen={isRiskModalOpen}
+        onClose={() => setIsRiskModalOpen(false)}
+      />
 
       <footer className="border-t border-ink/10 py-6 px-6 text-xs text-ink/50 text-center">
         Bhu-Setu · SIH 26014 — Integrated GIS based Digital Public Infrastructure for Land Governance

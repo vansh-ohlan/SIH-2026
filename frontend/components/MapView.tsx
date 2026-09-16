@@ -29,6 +29,10 @@ import {
   UtilityLine,
   GeoFeatureProperties,
 } from "@/lib/types";
+import { getParcelRiskAnalysis } from "@/lib/risk/mockRiskData";
+import { RiskAnalysis } from "@/lib/risk/riskTypes";
+import ParcelIntelligenceCard from "@/components/risk/ParcelIntelligenceCard";
+import RiskAnalysisModal from "@/components/risk/RiskAnalysisModal";
 
 // ==========================================
 // Color Palettes & Legend Constants (GovTech Theme)
@@ -55,6 +59,12 @@ const TAX_BAND_COLORS: Record<string, string> = {
   "Band A (Prime Commercial)": "#14213D",
   "Band B (Standard Residential)": "#C08A28",
   "Band C (Agricultural/Rural)": "#8F6518",
+};
+
+const RISK_LEVEL_COLORS: Record<string, string> = {
+  HIGH: "#DC2626", // Crimson Red
+  MODERATE: "#D97706", // Amber
+  LOW: "#059669", // Emerald Green
 };
 
 const UTILITY_COLORS: Record<string, string> = {
@@ -170,11 +180,20 @@ export default function MapView({
   const [utilities, setUtilities] = useState<UtilityLine[]>([]);
   const [selectedParcel, setSelectedParcel] = useState<GeoFeatureProperties | null>(null);
   const [selectedAlert, setSelectedAlert] = useState<EncroachmentAlert | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Risk Due-Diligence State
+  const [riskModalAnalysis, setRiskModalAnalysis] = useState<RiskAnalysis | null>(null);
+  const [isRiskModalOpen, setIsRiskModalOpen] = useState<boolean>(false);
+  const [activeRiskFilter, setActiveRiskFilter] = useState<
+    "all" | "high_risk" | "moderate_risk" | "low_risk" | "mortgage" | "dispute" | "zoning"
+  >("all");
 
   // Layer Visibility Controls
   const [baseLayerType, setBaseLayerType] = useState<"osm" | "satellite">("osm");
   const [showUlpinBadges, setShowUlpinBadges] = useState<boolean>(true);
-  const [colorMode, setColorMode] = useState<"land_use" | "zoning" | "tax_bands">("land_use");
+  const [colorMode, setColorMode] = useState<"land_use" | "zoning" | "tax_bands" | "risk_level">("land_use");
   const [showEncroachmentAlerts, setShowEncroachmentAlerts] = useState<boolean>(false);
   const [showUtilities, setShowUtilities] = useState<boolean>(false);
   const [controlPanelOpen, setControlPanelOpen] = useState<boolean>(false);
@@ -189,27 +208,36 @@ export default function MapView({
   // Load Region Specific Data
   useEffect(() => {
     let isMounted = true;
+    setLoading(true);
+    setError(null);
     Promise.all([
       getMapParcelsByRegion(activeRegionId),
       getEncroachmentAlerts(activeRegionId),
       getUtilityLines(activeRegionId),
-    ]).then(([geo, alerts, utilLines]) => {
-      if (!isMounted) return;
-      setParcelsGeo(geo);
-      setEncroachments(alerts);
-      setUtilities(utilLines);
+    ])
+      .then(([geo, alerts, utilLines]) => {
+        if (!isMounted) return;
+        setParcelsGeo(geo);
+        setEncroachments(alerts);
+        setUtilities(utilLines);
+        setLoading(false);
 
-      // Default highlight PB-LDH-0042 if in Punjab
-      if (activeRegionId === "punjab") {
-        const demoFeature = geo.features.find((f) => f.properties.ulpid === "PB-LDH-0042");
-        if (demoFeature) {
-          setSelectedParcel(demoFeature.properties);
+        // Default highlight PB-LDH-0042 if in Punjab
+        if (activeRegionId === "punjab") {
+          const demoFeature = geo.features.find((f) => f.properties.ulpid === "PB-LDH-0042");
+          if (demoFeature) {
+            setSelectedParcel(demoFeature.properties);
+          }
+        } else if (geo.features.length > 0) {
+          setSelectedParcel(geo.features[0].properties);
         }
-      } else if (geo.features.length > 0) {
-        setSelectedParcel(geo.features[0].properties);
-      }
-      setSelectedAlert(null);
-    });
+        setSelectedAlert(null);
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        setLoading(false);
+        setError(err.message || "Failed to load spatial data");
+      });
     return () => {
       isMounted = false;
     };
@@ -232,6 +260,34 @@ export default function MapView({
       }
     }
   }, [selectedUlpidProp, parcelsGeo]);
+
+  // Filter parcels based on Risk Engine criteria
+  const filteredParcelsGeo = useMemo(() => {
+    if (!parcelsGeo) return null;
+    if (activeRiskFilter === "all") return parcelsGeo;
+
+    const filteredFeatures = parcelsGeo.features.filter((feature) => {
+      const ulpid = feature.properties.ulpid;
+      const analysis = getParcelRiskAnalysis(ulpid);
+
+      if (activeRiskFilter === "high_risk") return analysis.level === "HIGH";
+      if (activeRiskFilter === "moderate_risk") return analysis.level === "MODERATE";
+      if (activeRiskFilter === "low_risk") return analysis.level === "LOW";
+      if (activeRiskFilter === "mortgage")
+        return analysis.factors.some((f) => f.category === "mortgage" && f.pointsContribution > 0);
+      if (activeRiskFilter === "dispute")
+        return analysis.factors.some((f) => f.category === "dispute" && f.pointsContribution > 0);
+      if (activeRiskFilter === "zoning")
+        return analysis.factors.some((f) => f.category === "zoning" && f.pointsContribution > 0);
+
+      return true;
+    });
+
+    return {
+      type: "FeatureCollection",
+      features: filteredFeatures,
+    } as GeoFeatureCollection;
+  }, [parcelsGeo, activeRiskFilter]);
 
   // Handle Region Jumper Selection
   const handleRegionSwitch = (region: PilotRegion) => {
@@ -279,12 +335,15 @@ export default function MapView({
       } else {
         fillColor = (props.tax_band && TAX_BAND_COLORS[props.tax_band]) || "#8F6518";
       }
+    } else if (colorMode === "risk_level") {
+      const riskAnalysis = getParcelRiskAnalysis(props.ulpid);
+      fillColor = RISK_LEVEL_COLORS[riskAnalysis.level] || "#059669";
     }
 
     const isRestriction = props.zoning === "Restriction Zone" || props.zoning === "Eco-Sensitive";
 
     // Demo parcel PB-LDH-0042 gets distinct amber border and subtle fill
-    if (isDemoParcel) {
+    if (isDemoParcel && colorMode !== "risk_level") {
       return {
         color: isSelected ? "#C08A28" : "#8F6518",
         weight: isSelected ? 3.5 : 2.5,
@@ -297,10 +356,10 @@ export default function MapView({
 
     return {
       color: isSelected ? "#14213D" : isRestriction ? "#B91C1C" : fillColor,
-      weight: isSelected ? 3 : isRestriction ? 2.5 : 1.5,
+      weight: isSelected ? 3.5 : isRestriction ? 2.5 : 1.5,
       dashArray: isRestriction ? "8 4" : undefined,
       fillColor,
-      fillOpacity: isSelected ? 0.55 : isRestriction ? 0.45 : baseLayerType === "satellite" ? 0.35 : 0.25,
+      fillOpacity: isSelected ? 0.6 : isRestriction ? 0.45 : baseLayerType === "satellite" ? 0.4 : 0.3,
       className: "parcel-polygon",
     };
   };
@@ -309,25 +368,35 @@ export default function MapView({
   const onEachParcel = (feature: Feature, layer: Layer) => {
     const props = feature.properties as GeoFeatureProperties;
     const isDemoMismatch = props.ulpid === "PB-LDH-0042";
+    const risk = getParcelRiskAnalysis(props.ulpid);
 
-    // Rich Standard Parcel Popup
+    const riskColor =
+      risk.level === "HIGH" ? "#DC2626" : risk.level === "MODERATE" ? "#D97706" : "#059669";
+
+    // Rich Standard Parcel Popup with Risk Indicator
     const popupHtml = `
-      <div style="font-family: system-ui, -apple-system, sans-serif; font-size: 12px; color: #14213D; min-width: 210px; padding: 2px;">
-        <div style="font-family: monospace; font-size: 11px; font-weight: bold; color: #C08A28; letter-spacing: 0.5px;">${props.ulpid}</div>
-        <div style="font-size: 14px; font-weight: 700; margin-top: 2px; color: #14213D;">${props.owner_name || (isDemoMismatch ? "Ramesh Kumar" : "Titleholder")}</div>
+      <div style="font-family: system-ui, -apple-system, sans-serif; font-size: 12px; color: #14213D; min-width: 220px; padding: 2px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-family: monospace; font-size: 11px; font-weight: bold; color: #C08A28;">${props.ulpid}</span>
+          <span style="font-size: 10px; font-weight: 700; color: ${riskColor}; background: #FFF; border: 1px solid ${riskColor}40; padding: 1px 5px; border-radius: 3px;">
+            ${risk.score}/100 ${risk.level}
+          </span>
+        </div>
+        <div style="font-size: 14px; font-weight: 700; margin-top: 3px; color: #14213D;">${props.owner_name || (isDemoMismatch ? "Ramesh Kumar" : "Titleholder")}</div>
         <div style="margin-top: 6px; font-size: 11px; color: #4A5568; line-height: 1.4;">
           <div><strong>Area:</strong> ${props.area_sqm?.toLocaleString() || (isDemoMismatch ? "1,250" : "—")} sqm</div>
           <div><strong>Land Use:</strong> ${props.land_use || "Residential"}</div>
         </div>
         ${
-          isDemoMismatch
-            ? `<div style="margin-top: 8px; padding: 6px 8px; background-color: #FEF3C7; border: 1px solid #F59E0B; border-radius: 4px; font-size: 11px;">
-                <div style="font-weight: 700; color: #92400E;">⚠ Potential Area Mismatch</div>
-                <div style="color: #78350F; margin-top: 2px;">RoR: 1,250 sqm | Survey: 1,180 sqm</div>
+          risk.topDrivers.length > 0
+            ? `<div style="margin-top: 6px; padding: 4px 6px; background-color: #FEF3C7; border: 1px solid #F59E0B; border-radius: 4px; font-size: 10px; color: #92400E;">
+                <strong>Key Risk Driver:</strong> ${risk.topDrivers[0].label} (+${risk.topDrivers[0].points} pts)
               </div>`
-            : ""
+            : `<div style="margin-top: 6px; padding: 4px 6px; background-color: #ECFDF5; border: 1px solid #10B981; border-radius: 4px; font-size: 10px; color: #065F46;">
+                ✓ Title & statutory records verified clear
+              </div>`
         }
-        <div style="margin-top: 10px;">
+        <div style="margin-top: 10px; display: grid; grid-template-columns: 1fr; gap: 4px;">
           <a href="/citizen/parcel/${props.ulpid}" style="display: block; text-align: center; background-color: #14213D; color: #EFEEE4; padding: 6px 10px; border-radius: 4px; text-decoration: none; font-weight: 600; font-size: 11px;">
             Open Full Parcel Record →
           </a>
@@ -335,21 +404,21 @@ export default function MapView({
       </div>
     `;
 
-    layer.bindPopup(popupHtml, { maxWidth: 280 });
+    layer.bindPopup(popupHtml, { maxWidth: 290 });
 
     layer.on({
       mouseover: (e) => {
         const target = e.target;
         target.setStyle({
-          fillOpacity: 0.55,
-          weight: 3,
+          fillOpacity: 0.65,
+          weight: 3.5,
         });
       },
       mouseout: (e) => {
         const target = e.target;
         if (selectedParcel?.ulpid !== props.ulpid) {
           target.setStyle({
-            fillOpacity: baseLayerType === "satellite" ? 0.35 : 0.25,
+            fillOpacity: baseLayerType === "satellite" ? 0.4 : 0.3,
             weight: props.ulpid === "PB-LDH-0042" ? 2.5 : 1.5,
           });
         }
@@ -370,6 +439,46 @@ export default function MapView({
 
   return (
     <div className="relative h-full w-full overflow-hidden font-sans">
+      {/* Loading Overlay */}
+      {loading && (
+        <div className="absolute inset-0 z-[2000] flex items-center justify-center bg-parchment-dark/60 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 rounded bg-parchment p-6 plot-border-solid shadow-xl">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-ochre border-t-transparent" />
+            <div className="font-mono text-xs font-semibold text-ink">Loading Spatial Data...</div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Overlay */}
+      {error && (
+        <div className="absolute inset-0 z-[2000] flex items-center justify-center bg-parchment-dark/60 backdrop-blur-sm">
+          <div className="flex max-w-sm flex-col items-center gap-3 rounded bg-parchment p-6 plot-border-solid shadow-xl text-center">
+            <span className="text-2xl">⚠️</span>
+            <div className="font-mono text-xs font-semibold text-[#ef4444]">Failed to load GIS layers</div>
+            <div className="text-[11px] text-ink/70">{error}</div>
+            <button onClick={() => window.location.reload()} className="mt-2 rounded bg-ink px-4 py-1.5 text-xs text-parchment hover:bg-ink-light transition">
+              Retry Connection
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Empty State Overlay */}
+      {!loading && !error && filteredParcelsGeo?.features.length === 0 && (
+        <div className="absolute inset-0 z-[1900] flex flex-col items-center justify-center bg-transparent pointer-events-none">
+          <div className="rounded bg-parchment/90 p-4 shadow-md backdrop-blur text-center border border-ink/10 pointer-events-auto">
+            <div className="font-serif font-bold text-ink">No Matching Parcels for Filter</div>
+            <div className="text-xs text-ink/60 mt-1">Try selecting &quot;All Parcels&quot; in the Risk Filters.</div>
+            <button
+              onClick={() => setActiveRiskFilter("all")}
+              className="mt-2 text-xs font-mono font-bold text-ochre-dark underline"
+            >
+              Reset Filter to All
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* =================================================================== */}
       {/* TOP-LEFT: Quick Action Bar & Multi-State Region Jumper              */}
       {/* =================================================================== */}
@@ -388,14 +497,14 @@ export default function MapView({
             className="flex items-center gap-1 rounded bg-ink/5 hover:bg-ink/10 px-2.5 py-1 text-xs font-semibold text-ink transition-all"
             title="Fit all parcels in view"
           >
-            <span>⛶ Fit All Parcels</span>
+            <span>⛶ Fit All</span>
           </button>
           <button
             onClick={handleResetView}
             className="flex items-center gap-1 rounded bg-ink/5 hover:bg-ink/10 px-2 py-1 text-xs font-medium text-ink/70 transition-all"
             title="Reset map camera"
           >
-            <span>↺ Reset View</span>
+            <span>↺ Reset</span>
           </button>
         </div>
 
@@ -431,6 +540,36 @@ export default function MapView({
               );
             })}
           </div>
+        </div>
+
+        {/* Risk Filter Presets Ribbon */}
+        <div className="flex flex-wrap items-center gap-1 rounded-sm bg-parchment/95 p-1.5 plot-border-solid shadow-sm backdrop-blur text-[11px]">
+          <span className="text-[10px] font-mono uppercase font-bold text-ink/50 px-1">
+            Risk Filters:
+          </span>
+          {[
+            { id: "all", label: "All" },
+            { id: "high_risk", label: "🔴 High Risk" },
+            { id: "moderate_risk", label: "🟠 Moderate" },
+            { id: "mortgage", label: "🏦 Mortgages" },
+            { id: "dispute", label: "⚖️ Disputes" },
+            { id: "zoning", label: "📐 Zoning" },
+          ].map((flt) => {
+            const isActive = activeRiskFilter === flt.id;
+            return (
+              <button
+                key={flt.id}
+                onClick={() => setActiveRiskFilter(flt.id as any)}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-all ${
+                  isActive
+                    ? "bg-ink text-parchment font-bold shadow-xs"
+                    : "bg-ink/5 text-ink/70 hover:bg-ink/10"
+                }`}
+              >
+                {flt.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -504,11 +643,12 @@ export default function MapView({
             {/* 3. Essential Layer: Zoning / Classification State */}
             <div className="mt-2.5 border-t border-ink/10 pt-2">
               <label className="block text-[10px] font-mono uppercase tracking-wider text-ink/60">
-                2. Land Classification
+                2. Land Classification &amp; Risk Shading
               </label>
               <div className="mt-1 flex flex-col gap-1">
                 {[
                   ["land_use", "Land Use Classification"],
+                  ["risk_level", "🛡️ AI Land Risk Score Level"],
                   ["zoning", "Statutory Zoning"],
                   ["tax_bands", "Tax Valuation Bands"],
                 ].map(([modeKey, label]) => (
@@ -573,70 +713,18 @@ export default function MapView({
       </div>
 
       {/* =================================================================== */}
-      {/* BOTTOM-LEFT: Selected Parcel Inspector Card                         */}
+      {/* BOTTOM-LEFT: Selected Parcel Intelligence Inspector Card            */}
       {/* =================================================================== */}
       {selectedParcel && (
-        <div className="absolute bottom-3 left-3 z-[1000] w-72 sm:w-80 rounded-sm bg-parchment/95 p-3.5 plot-border-solid shadow-md backdrop-blur">
-          <div className="flex items-start justify-between border-b border-ink/15 pb-1.5">
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono text-[11px] font-bold text-ochre-dark">
-                  {selectedParcel.ulpid}
-                </span>
-                {selectedParcel.ulpid === "PB-LDH-0042" && (
-                  <span className="bg-ochre/20 text-ochre-dark text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">
-                    Demo Parcel
-                  </span>
-                )}
-              </div>
-              <h4 className="font-serif text-sm font-bold text-ink mt-0.5">
-                {selectedParcel.owner_name ?? (selectedParcel.ulpid === "PB-LDH-0042" ? "Ramesh Kumar" : "Landowner")}
-              </h4>
-            </div>
-            <button
-              onClick={() => setSelectedParcel(null)}
-              className="text-xs text-ink/50 hover:text-ink p-0.5"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <span className="text-[10px] text-ink/50 uppercase font-mono">Land Use</span>
-              <div className="font-medium text-ink">
-                {selectedParcel.land_use ?? "Residential"}
-              </div>
-            </div>
-            <div>
-              <span className="text-[10px] text-ink/50 uppercase font-mono">Total Area</span>
-              <div className="font-serif font-bold text-ink">
-                {selectedParcel.area_sqm?.toLocaleString() ?? (selectedParcel.ulpid === "PB-LDH-0042" ? "1,250" : "—")} sqm
-              </div>
-            </div>
-          </div>
-
-          {/* Prominent Mismatch Box for Demo Parcel PB-LDH-0042 */}
-          {selectedParcel.ulpid === "PB-LDH-0042" && (
-            <div className="mt-2 rounded bg-amber-50 p-2 text-[11px] text-amber-900 border border-amber-300">
-              <div className="font-bold flex items-center gap-1 text-amber-800">
-                <span>⚠</span>
-                <span>Potential Area Mismatch</span>
-              </div>
-              <div className="mt-1 text-[10px] text-amber-900/80 font-mono">
-                RoR: 1,250 sqm · Survey: 1,180 sqm (Diff: 70 sqm)
-              </div>
-            </div>
-          )}
-
-          <div className="mt-2.5">
-            <button
-              onClick={() => router.push(`/citizen/parcel/${selectedParcel.ulpid}`)}
-              className="w-full rounded-sm bg-ink px-3 py-1.5 text-center text-xs font-medium text-parchment hover:bg-ink-light transition"
-            >
-              Open Full Parcel Record →
-            </button>
-          </div>
+        <div className="absolute bottom-3 left-3 z-[1000] max-w-sm">
+          <ParcelIntelligenceCard
+            analysis={getParcelRiskAnalysis(selectedParcel.ulpid)}
+            onOpenDetailedAnalysis={() => {
+              setRiskModalAnalysis(getParcelRiskAnalysis(selectedParcel.ulpid));
+              setIsRiskModalOpen(true);
+            }}
+            onClose={() => setSelectedParcel(null)}
+          />
         </div>
       )}
 
@@ -655,6 +743,22 @@ export default function MapView({
                 <span>{label}</span>
               </span>
             ))}
+          {colorMode === "risk_level" && (
+            <>
+              <span className="flex items-center gap-1 text-[10px] font-bold text-red-800">
+                <span className="h-2 w-2 rounded-sm bg-red-600" />
+                <span>High (70-100)</span>
+              </span>
+              <span className="flex items-center gap-1 text-[10px] font-bold text-amber-800">
+                <span className="h-2 w-2 rounded-sm bg-amber-600" />
+                <span>Moderate (30-69)</span>
+              </span>
+              <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-800">
+                <span className="h-2 w-2 rounded-sm bg-emerald-600" />
+                <span>Low (0-29)</span>
+              </span>
+            </>
+          )}
         </div>
       </div>
 
@@ -684,11 +788,11 @@ export default function MapView({
           />
         )}
 
-        {/* Layer 2: Cadastral GeoJSON Parcels (Source of Truth) */}
-        {parcelsGeo && (
+        {/* Layer 2: Cadastral GeoJSON Parcels (Filtered & Styled) */}
+        {filteredParcelsGeo && (
           <GeoJSON
-            key={`${activeRegionId}-${colorMode}-${baseLayerType}-${selectedParcel?.ulpid ?? ""}`}
-            data={parcelsGeo as any}
+            key={`${activeRegionId}-${colorMode}-${baseLayerType}-${activeRiskFilter}-${selectedParcel?.ulpid ?? ""}`}
+            data={filteredParcelsGeo as any}
             style={getParcelStyle}
             onEachFeature={onEachParcel}
           />
@@ -696,7 +800,7 @@ export default function MapView({
 
         {/* Layer 2b: Permanent/Hover ULPID Badges */}
         {showUlpinBadges &&
-          parcelsGeo?.features.map((f) => {
+          filteredParcelsGeo?.features.map((f) => {
             const coords = f.geometry.coordinates[0];
             return (
               <Polygon
@@ -773,7 +877,7 @@ export default function MapView({
 
         {/* Controller for Camera Animations & Auto-fitBounds */}
         <MapController
-          parcelsGeo={parcelsGeo}
+          parcelsGeo={filteredParcelsGeo}
           focusCoords={focus ?? null}
           fitTrigger={fitTrigger}
           demoFocusTrigger={demoFocusTrigger}
@@ -782,6 +886,13 @@ export default function MapView({
           defaultZoom={currentRegion?.zoom ?? 14}
         />
       </MapContainer>
+
+      {/* In-Map Quick Risk Analysis Dossier Modal */}
+      <RiskAnalysisModal
+        analysis={riskModalAnalysis}
+        isOpen={isRiskModalOpen}
+        onClose={() => setIsRiskModalOpen(false)}
+      />
     </div>
   );
 }

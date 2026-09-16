@@ -95,18 +95,23 @@ export default function MapExplorerPage() {
                     <span>Focus</span>
                   </button>
                 </div>
-                <div className="font-mono text-base font-bold text-ink mt-1">
-                  PB-LDH-0042
+                <div className="font-mono text-base font-bold text-ink mt-1 flex items-center justify-between">
+                  <span>PB-LDH-0042</span>
+                  <span className="bg-red-100 text-red-950 border border-red-300 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">
+                    78/100 · High Risk
+                  </span>
                 </div>
                 <div className="text-xs text-ink/80 mt-0.5">
                   Ramesh Kumar · 1,250 sqm · Residential
                 </div>
 
-                <div className="mt-2.5 p-2 bg-amber-50 border border-amber-300 rounded text-[11px] text-amber-900 flex items-start gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-700" />
-                  <div>
-                    <strong className="block font-semibold">Potential Area Mismatch</strong>
-                    <span className="text-[10px] font-mono">RoR: 1,250 sqm · Survey: 1,180 sqm</span>
+                <div className="mt-2.5 p-2 bg-red-50/80 border border-red-300 rounded text-[11px] text-red-950 space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-red-900">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-700" />
+                    <span>Active Due-Diligence Flags</span>
+                  </div>
+                  <div className="text-[10px] text-red-900/80 font-mono">
+                    Civil Dispute (+25) · Mortgage (+15) · Zoning (+10) · Variance (+10)
                   </div>
                 </div>
 
@@ -114,7 +119,7 @@ export default function MapExplorerPage() {
                   href="/citizen/parcel/PB-LDH-0042"
                   className="mt-3 w-full bg-ink text-parchment py-2 rounded text-xs font-semibold text-center flex items-center justify-center gap-1.5 hover:bg-ink-light transition-colors"
                 >
-                  <span>Open Full Parcel Record</span>
+                  <span>Open Full Parcel Record &amp; Risk Tab</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </Link>
               </div>

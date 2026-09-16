@@ -22,6 +22,7 @@ export default function OfficerSidebar() {
 
   const menuItems = [
     { href: "/officer", label: "Overview Dashboard", icon: LayoutDashboard },
+    { href: "/officer/risk", label: "AI Risk & Due-Diligence", icon: ShieldAlert, count: 3 },
     { href: "/officer/conflicts", label: "Inconsistency & Conflicts", icon: ShieldAlert, count: 1 },
     { href: "/officer/mutations", label: "Mutation Adjudication", icon: FileCheck2 },
     { href: "/map", label: "Cadastral GIS Explorer", icon: Layers },
