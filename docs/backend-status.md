@@ -11,7 +11,7 @@
 - [x] **PostgreSQL Connection Pool & PostGIS Schema**: Implemented connection pooling via `pg.Pool`, `parcels` table with `geometry(Polygon, 4326)` and GiST spatial indexing, `mutations` table with SHA-256 hash chaining.
 - [x] **Database Migration Engine & Deterministic Seeder**: Versioned migration runner and seed runner populating multi-state pilot parcels (`PB-LDH-0042`, `PB-LDH-0043`, `PB-LDH-0044`, `CH-SEC-1701`, `TN-SPR-0814`).
 - [x] **OCR Pipeline Architecture (`OcrService`)**: Clean modular pipeline: Ingestion -> Input Validation -> Preprocessing -> OCR Engine -> Field Extraction & Normalization -> Confidence Scoring.
-- [x] **Frozen API Contract Fidelity**: 100% compliance with `docs/api-contracts.md` for `POST /api/ocr/extract` (`owner`, `area`, `survey_no`, `confidence` / 422 `unreadable_document` with exact message `OCR could not extract required fields`).
+- [x] **Frozen API Contract Fidelity**: Full fidelity with `docs/api-contracts.md` for `POST /api/ocr/extract` (`owner`, `area`, `survey_no`, `confidence` / 422 `unreadable_document` with exact message `OCR could not extract required fields`).
 - [x] **Multi-Source Adapters Architecture**:
   - `StateLandRecordAdapter` for RoR/Jamabandi revenue registers.
   - `BhuNakshaGisAdapter` for ground cadastral GIS polygons.
