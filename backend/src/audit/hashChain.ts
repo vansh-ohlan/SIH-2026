@@ -11,19 +11,26 @@ export interface HashChainInput {
 }
 
 /**
+ * Produces a deterministic canonical serialization of the mutation audit record.
+ * Uses structured pipe-delimited fields with explicit key labels to eliminate serialization ambiguity.
+ */
+export function canonicalizeAuditPayload(input: HashChainInput): string {
+  return [
+    `prev:${input.previous_hash || ''}`,
+    `ulpid:${input.ulpid || ''}`,
+    `dec:${input.decision || ''}`,
+    `off:${input.officer_id || ''}`,
+    `notes:${(input.notes || '').trim()}`,
+    `ts:${input.timestamp || ''}`
+  ].join('|');
+}
+
+/**
  * Computes a deterministic SHA-256 hash chaining to the previous mutation hash.
  * Provides a tamper-evident audit trail for land parcel mutations.
  */
 export function generateAuditHash(input: HashChainInput): string {
-  const payload = [
-    input.previous_hash,
-    input.ulpid,
-    input.decision,
-    input.officer_id,
-    input.notes,
-    input.timestamp
-  ].join('|');
-
+  const payload = canonicalizeAuditPayload(input);
   return crypto.createHash('sha256').update(payload, 'utf8').digest('hex');
 }
 

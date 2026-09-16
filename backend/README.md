@@ -371,7 +371,7 @@ The Bhu-Setu API Gateway employs lightweight, standard JWT Bearer authentication
 - **Spatial Reference System**: **EPSG:4326 (WGS 84)** is used for all geometry columns (`geometry(Polygon, 4326)`).
 - **Indexing**: Spatial GiST index `idx_parcels_geometry` is applied for sub-millisecond bounding box and intersection queries.
 - **Centroid Queries**: Centroids for parcel searches are computed in PostGIS using `ROUND(ST_Y(ST_Centroid(geometry))::numeric, 4)` and `ROUND(ST_X(ST_Centroid(geometry))::numeric, 4)`.
-- **Tamper-Evident Audit Trail**: Mutation decisions calculate a SHA-256 hash chained to the previous mutation record for that parcel, ensuring cryptographic immutability without blockchain overhead.
+- **Tamper-Evident Audit Trail**: Mutation decisions calculate a SHA-256 hash chained to the previous mutation record for that parcel, providing a tamper-evident audit record without blockchain overhead.
 
 ---
 

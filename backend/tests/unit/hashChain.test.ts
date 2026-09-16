@@ -1,6 +1,22 @@
-import { generateAuditHash, verifyAuditHash, GENESIS_HASH } from '../../src/audit/hashChain';
+import { generateAuditHash, verifyAuditHash, canonicalizeAuditPayload, GENESIS_HASH } from '../../src/audit/hashChain';
 
 describe('Audit Hash Chain Generator', () => {
+  it('should generate deterministic canonical serialization with structured key labels', () => {
+    const input = {
+      ulpid: 'PB-LDH-0042',
+      decision: 'approved' as const,
+      officer_id: 'OFF-102',
+      notes: '  Verified against original survey map  ',
+      timestamp: '2026-09-08T10:15:00Z',
+      previous_hash: GENESIS_HASH
+    };
+
+    const canonical = canonicalizeAuditPayload(input);
+    expect(canonical).toBe(
+      `prev:${GENESIS_HASH}|ulpid:PB-LDH-0042|dec:approved|off:OFF-102|notes:Verified against original survey map|ts:2026-09-08T10:15:00Z`
+    );
+  });
+
   it('should generate a deterministic SHA-256 hash for given inputs', () => {
     const input = {
       ulpid: 'PB-LDH-0042',

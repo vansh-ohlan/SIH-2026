@@ -1,7 +1,7 @@
 # Bhu-Setu Backend Implementation Status
 
 **Current Branch**: `feature/stage4-parcel-gis-reconciliation`  
-**Current Milestone**: Stage 6 — Demo Hardening, Evidence Integrity & Judge Readiness  
+**Current Milestone**: Stage 7 — Final Judge Demo, Integration Validation & Technical Hardening  
 **Integration Branch**: `dev`  
 
 ---
@@ -32,7 +32,12 @@
   - **Cryptographic Audit Verification (`verifyAuditHash`)**: Deterministic SHA-256 integrity verification helper function with full unit test coverage against tampered payloads.
   - **Demo Data Consistency**: Audited and synchronized `PB-LDH-0042` (70 sqm / 5.6% variance) and `PB-LDH-0044` (consistent demo data across configured sources) across fixtures, services, and UI.
   - **Demo Resilience & Safeguards**: Modal submission safety, clear `[DEMO / SYNTHETIC DATA]` labels, and robust error state handling.
-- [x] **Comprehensive Test Suites**: Unit and integration tests covering OCR, decision support, PostGIS spatial queries, parcel cross-reconciliation, RBAC enforcement, `verifyAuditHash`, and Stage 5/6 governance workflow (`stage5GovernanceWorkflow.test.ts`, `hashChain.test.ts`).
+- [x] **Stage 7 Integration Validation & Canonical Hardening**:
+  - **Canonical Serialization**: Added `canonicalizeAuditPayload` with structured key-value serialization to eliminate delimiter ambiguity.
+  - **Edge-Case Hardening**: Validated 404 for non-existent ULPIDs, 400 for empty notes and malformed bodies, and 403 for unauthorized citizen mutation attempts.
+  - **Contract Preservation**: Preserved frozen OCR contract (`POST /api/ocr/extract`) and reconciliation contract (`GET /api/parcel/:ulpid/reconciliation`).
+  - **Static Code Review**: Complete static code audit and documentation of local environment status.
+- [x] **Comprehensive Test Suites**: Unit and integration tests covering OCR, decision support, PostGIS spatial queries, parcel cross-reconciliation, RBAC enforcement, `verifyAuditHash`, `canonicalizeAuditPayload`, and Stage 5/6/7 governance workflows (`stage5GovernanceWorkflow.test.ts`, `hashChain.test.ts`).
 
 ---
 
