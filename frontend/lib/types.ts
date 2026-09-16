@@ -68,7 +68,7 @@ export interface Parcel {
   ulpid: string;
   ulpin?: string;
   geometry: Geometry;
-  owner: { name: string; since: string; father_or_husband_name?: string };
+  owner: { name: string; since: string; father_or_husband_name?: string; title_ref?: string };
   area_sqm: number;
   land_use: string;
   village?: string;
@@ -82,10 +82,12 @@ export interface Parcel {
   surveyed_area_sqm?: number;
   khewat_no?: string;
   khatauni_no?: string;
+  khasra_no?: string;
   survey_no?: string;
   valuation_band?: string;
   rate_per_sqm?: number;
   ledger_receipt?: LedgerReceipt;
+  source_records?: MultiSourceRecords;
 }
 
 export interface MultiSourceRecords {
@@ -93,27 +95,28 @@ export interface MultiSourceRecords {
     khewat_no?: string;
     khatauni_no?: string;
     khasra_no?: string;
-    declared_area_sqm: number;
-    owner_name: string;
-    last_mutation_date: string;
+    patta_no?: string;
+    declared_area_sqm?: number;
+    owner_name?: string;
+    last_mutation_date?: string;
   };
   cadastral_gis?: {
-    polygon_area_sqm: number;
+    polygon_area_sqm?: number;
     perimeter_m?: number;
-    centroid: [number, number];
-    srid: number;
-    layer_name: string;
+    centroid?: [number, number];
+    srid?: number;
+    layer_name?: string;
   };
   registration_ngdrs?: {
     deed_number?: string;
     registration_date?: string;
     registered_party?: string;
-    encumbrance_status: "clear" | "mortgaged" | "disputed" | "under_review";
+    encumbrance_status?: "clear" | "mortgaged" | "disputed" | "under_review";
   };
   municipal_zoning?: {
-    zone_code: string;
-    permitted_use: string;
-    circle_rate_per_sqm: number;
+    zone_code?: string;
+    permitted_use?: string;
+    circle_rate_per_sqm?: number;
   };
 }
 
