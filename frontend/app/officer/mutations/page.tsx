@@ -493,7 +493,7 @@ function MutationContent() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[
                       { id: "needs_review", label: "Needs Review", desc: "Field survey required", icon: Clock, border: "hover:border-ochre" },
-                      { id: "approved", label: "Approve Mutation", desc: "Title transfer confirmed", icon: CheckCircle2, border: "hover:border-land" },
+                      { id: "approved", label: "Approve Mutation", desc: "Official record update approved", icon: CheckCircle2, border: "hover:border-land" },
                       { id: "rejected", label: "Reject Mutation", desc: "Disputed claim", icon: XCircle, border: "hover:border-brick" },
                     ].map((opt) => {
                       const active = decision === opt.id;

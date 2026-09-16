@@ -419,7 +419,7 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       timestamp: "1966-11-01T00:00:00.000Z",
       signing_authority: "Chief Administrator & Heritage Conservator · Chandigarh Administration",
       jurisdiction: "Protected Sector Green Belt Corridor, Chandigarh",
-      verification_status: "verified_immutable",
+      verification_status: "verified_tamper_evident",
     },
   },
   "CH-ITP-0301": {

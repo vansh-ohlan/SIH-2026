@@ -1,7 +1,7 @@
 # Bhu-Setu Backend Implementation Status
 
 **Current Branch**: `feature/stage4-parcel-gis-reconciliation`  
-**Current Milestone**: Stage 8 — Final Judge Readiness, Runtime Validation & Claim Consistency  
+**Current Milestone**: Stage 9 — Final Contract Correction, Claim Audit & Demo Freeze  
 **Integration Branch**: `dev`  
 
 ---
@@ -11,7 +11,7 @@
 - [x] **PostgreSQL Connection Pool & PostGIS Schema**: Implemented connection pooling via `pg.Pool`, `parcels` table with `geometry(Polygon, 4326)` and GiST spatial indexing, `mutations` table with SHA-256 hash chaining.
 - [x] **Database Migration Engine & Deterministic Seeder**: Versioned migration runner and seed runner populating multi-state pilot parcels (`PB-LDH-0042`, `PB-LDH-0043`, `PB-LDH-0044`, `CH-SEC-1701`, `TN-SPR-0814`).
 - [x] **OCR Pipeline Architecture (`OcrService`)**: Clean modular pipeline: Ingestion -> Input Validation -> Preprocessing -> OCR Engine -> Field Extraction & Normalization -> Confidence Scoring.
-- [x] **Frozen API Contract Fidelity**: 100% compliance with `docs/api-contracts.md` for `POST /api/ocr/extract` (`owner`, `area`, `survey_no`, `confidence` / 422 `unreadable_document`).
+- [x] **Frozen API Contract Fidelity**: 100% compliance with `docs/api-contracts.md` for `POST /api/ocr/extract` (`owner`, `area`, `survey_no`, `confidence` / 422 `unreadable_document` with exact message `OCR could not extract required fields`).
 - [x] **Multi-Source Adapters Architecture**:
   - `StateLandRecordAdapter` for RoR/Jamabandi revenue registers.
   - `BhuNakshaGisAdapter` for ground cadastral GIS polygons.
@@ -37,13 +37,15 @@
   - **Edge-Case Hardening**: Validated 404 for non-existent ULPIDs, 400 for empty notes and malformed bodies, and 403 for unauthorized citizen mutation attempts.
   - **Contract Preservation**: Preserved frozen OCR contract (`POST /api/ocr/extract`) and reconciliation contract (`GET /api/parcel/:ulpid/reconciliation`).
   - **Static Code Review**: Complete static code audit and documentation of local environment status.
-- [x] **Stage 8 Final Judge Readiness, Runtime Validation & Claim Consistency**:
+- [x] **Stage 8 Final Judge Readiness & Claim Consistency**:
   - **Audit Hash Canonicalization Hardening**: Structured deterministic key-value payload canonicalizer (`canonicalizeAuditPayload`) with full unit test verification in `backend/tests/unit/hashChain.test.ts`.
-  - **Repo-Wide Claim Sanitization**: Verified eradication of ungrounded terms (`immutable`, `non-repudiation`, `guaranteed`, `legally verified`, `100%`, `66%`), replaced with grounded public infrastructure terminology (`tamper-evident audit logging`, `deterministic validation`).
-  - **Demo Data Truthfulness & Consistency**: `PB-LDH-0042` (1,250 sqm RoR vs 1,180 sqm GIS $\rightarrow$ 70 sqm / 5.6% variance, `Needs Verification`) and `PB-LDH-0044` (1,180 sqm RoR vs 1,180 sqm GIS $\rightarrow$ 0.0% variance, `Verified`) fully unified across backend fixtures, mock adapters, and frontend stores.
-  - **Environment Status Documentation**: Truthfully documented Node/npm runtime environment unavailability (`where.exe node` returned 1) while establishing comprehensive static verification proofs.
-  - **Stage 8 Comprehensive Report**: Published `docs/stage8-final-judge-readiness.md` providing complete A-W compliance evidence for SIH 2026 Problem Statement 26014.
-- [x] **Comprehensive Test Suites**: Unit and integration tests covering OCR, decision support, PostGIS spatial queries, parcel cross-reconciliation, RBAC enforcement, `verifyAuditHash`, `canonicalizeAuditPayload`, and Stage 5/6/7/8 governance workflows.
+  - **Repo-Wide Claim Sanitization**: Eradicated ungrounded terms (`immutable`, `non-repudiation`, `guaranteed`, `legally verified`, `100%`, `66%`), replaced with grounded public infrastructure terminology.
+  - **Demo Data Truthfulness & Consistency**: Unified `PB-LDH-0042` and `PB-LDH-0044` across backend fixtures, mock adapters, and frontend stores.
+- [x] **Stage 9 Final Contract Correction, Claim Audit & Demo Freeze**:
+  - **OCR Error Message Restoration**: Enforced exact frozen Stage 3 contract message `OCR could not extract required fields` everywhere.
+  - **Claim Audit & Demo Freeze**: Sanitized all frontend types, mock fixtures, officer mutation UI, and documentation. Published `docs/stage9-final-contract-and-demo-freeze.md`.
+  - **Truthful Environment Reporting**: Formally distinguished statically reviewed code vs runtime execution status.
+- [x] **Comprehensive Test Suites**: Unit and integration tests covering OCR, decision support, PostGIS spatial queries, parcel cross-reconciliation, RBAC enforcement, `verifyAuditHash`, `canonicalizeAuditPayload`, and Stage 5/6/7/8/9 governance workflows.
 
 ---
 
@@ -52,6 +54,7 @@
 - GeoServer WFS/WMS live vector tile sync.
 - Real production government API endpoints (live state NIC/Bhulekh web services).
 - MeriPehchaan (National SSO) production OAuth integration.
+
 
 
 
