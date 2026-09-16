@@ -58,10 +58,25 @@ export class UnauthorizedError extends AppError {
   }
 }
 
+export class InvalidCredentialsError extends UnauthorizedError {
+  constructor(message = 'Invalid username or password') {
+    super(message, 'invalid_credentials');
+    this.name = 'InvalidCredentialsError';
+  }
+}
+
+export class DuplicateUserError extends AppError {
+  constructor(message = 'A user with this username or email already exists') {
+    super(409, 'duplicate_user', message);
+    this.name = 'DuplicateUserError';
+  }
+}
+
 export class ForbiddenError extends AppError {
   constructor(message = 'Insufficient permissions to perform this action', errorCode = 'forbidden') {
     super(403, errorCode, message);
     this.name = 'ForbiddenError';
   }
 }
+
 

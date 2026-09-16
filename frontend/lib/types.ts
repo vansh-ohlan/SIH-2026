@@ -4,7 +4,27 @@ export interface AuthUser {
   userId: string;
   role: UserRole;
   name?: string;
+  email?: string;
+  username?: string;
   officerId?: string;
+}
+
+export interface RegisterRequest {
+  name: string;
+  email: string;
+  username: string;
+  password: string;
+}
+
+export interface RegisterResponse {
+  message: string;
+  user: {
+    userId: string;
+    username: string;
+    email: string;
+    name: string;
+    role: UserRole;
+  };
 }
 
 export interface DevTokenResponse {

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { AuthUser, UserRole } from "./types";
-import { generateDevToken, getAuthMe } from "./api";
+import { generateDevToken, getAuthMe, loginUser } from "./api";
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -10,7 +10,9 @@ interface AuthContextType {
   role: UserRole;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (role: UserRole, customData?: { userId?: string; name?: string; officerId?: string }) => Promise<void>;
+  loginWithCredentials: (identifier: string, password: string) => Promise<AuthUser>;
+  loginAsDevRole: (role: UserRole, customData?: { userId?: string; name?: string; officerId?: string }) => Promise<void>;
+  login: (roleOrIdentifier: UserRole | string, passwordOrCustomData?: string | { userId?: string; name?: string; officerId?: string }) => Promise<void>;
   logout: () => void;
   hasRole: (roles: UserRole[]) => boolean;
 }
@@ -35,15 +37,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setToken(storedToken);
         setUser(JSON.parse(storedUser));
 
-        // Optionally verify with backend
-        getAuthMe(storedToken).then((verifiedUser) => {
-          if (verifiedUser) {
-            setUser(verifiedUser);
-            localStorage.setItem(USER_KEY, JSON.stringify(verifiedUser));
-          }
-        }).catch(() => {
-          // Token might be expired or backend offline - keep local state for demo
-        });
+        // Verify with backend
+        getAuthMe(storedToken)
+          .then((verifiedUser) => {
+            if (verifiedUser) {
+              setUser(verifiedUser);
+              localStorage.setItem(USER_KEY, JSON.stringify(verifiedUser));
+            }
+          })
+          .catch(() => {
+            // Token might be expired or backend offline - keep local state for demo
+          });
       }
     } catch {
       // Ignore localStorage errors
@@ -52,7 +56,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = useCallback(
+  const loginWithCredentials = useCallback(
+    async (identifier: string, password: string): Promise<AuthUser> => {
+      setIsLoading(true);
+      try {
+        const response = await loginUser(identifier, password);
+        if (response && response.token && response.user) {
+          setToken(response.token);
+          setUser(response.user);
+          try {
+            localStorage.setItem(TOKEN_KEY, response.token);
+            localStorage.setItem(USER_KEY, JSON.stringify(response.user));
+          } catch {}
+          return response.user;
+        }
+        throw new Error("Invalid login response from server");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  const loginAsDevRole = useCallback(
     async (
       role: UserRole,
       customData?: { userId?: string; name?: string; officerId?: string }
@@ -60,11 +86,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       try {
         const response = await generateDevToken(role, customData);
-        if (response) {
+        if (response && response.token && response.user) {
           setToken(response.token);
           setUser(response.user);
-          localStorage.setItem(TOKEN_KEY, response.token);
-          localStorage.setItem(USER_KEY, JSON.stringify(response.user));
+          try {
+            localStorage.setItem(TOKEN_KEY, response.token);
+            localStorage.setItem(USER_KEY, JSON.stringify(response.user));
+          } catch {}
         }
       } catch (err) {
         console.error("Login failed:", err);
@@ -73,6 +101,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     },
     []
+  );
+
+  // Overloaded login method for flexible compatibility
+  const login = useCallback(
+    async (
+      roleOrIdentifier: UserRole | string,
+      passwordOrCustomData?: string | { userId?: string; name?: string; officerId?: string }
+    ) => {
+      if (typeof passwordOrCustomData === "string") {
+        await loginWithCredentials(roleOrIdentifier, passwordOrCustomData);
+      } else if (
+        roleOrIdentifier === "citizen" ||
+        roleOrIdentifier === "revenue_officer" ||
+        roleOrIdentifier === "registrar" ||
+        roleOrIdentifier === "admin"
+      ) {
+        await loginAsDevRole(roleOrIdentifier as UserRole, passwordOrCustomData as any);
+      } else {
+        await loginWithCredentials(roleOrIdentifier, "BhuSetu@2026");
+      }
+    },
+    [loginWithCredentials, loginAsDevRole]
   );
 
   const logout = useCallback(() => {
@@ -105,6 +155,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role,
         isAuthenticated,
         isLoading,
+        loginWithCredentials,
+        loginAsDevRole,
         login,
         logout,
         hasRole,

@@ -95,9 +95,7 @@ export default function HomePage() {
           </h1>
 
           <p className="mt-4 max-w-2xl text-sm sm:text-base text-ink/80 leading-relaxed font-sans">
-            Connecting existing land systems around a common parcel identity.
-            Bhu-Setu unites Record of Rights (RoR), cadastral survey geometry, deed registration, and
-            municipal tax into a unified, spatially verifiable, and auditable view.
+            Bhu-Setu does not replace existing land systems. It connects authorized land information around a common parcel identity and provides a unified, spatially verifiable, and auditable view.
           </p>
 
           {/* Quick Search Box */}

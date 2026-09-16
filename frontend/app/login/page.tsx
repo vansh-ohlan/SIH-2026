@@ -1,221 +1,371 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/lib/authContext";
 import { UserRole } from "@/lib/types";
 import {
-  UserCheck,
-  ShieldCheck,
-  Building,
-  FileCheck2,
   Lock,
   ArrowRight,
-  Info,
-  Loader2,
+  Eye,
+  EyeOff,
+  AlertCircle,
   CheckCircle2,
+  Loader2,
+  UserCheck,
+  FileCheck2,
+  Building,
+  ShieldCheck,
+  Search,
+  UserPlus,
 } from "lucide-react";
 
-export default function LoginPage() {
+function LoginFormContent() {
   const router = useRouter();
-  const { user, role: currentRole, login, isLoading } = useAuth();
-  const [selectedRole, setSelectedRole] = useState<UserRole>("revenue_officer");
-  const [customName, setCustomName] = useState("");
-  const [customId, setCustomId] = useState("");
-  const [loggingIn, setLoggingIn] = useState(false);
+  const searchParams = useSearchParams();
+  const { loginWithCredentials, loginAsDevRole } = useAuth();
 
-  const roleOptions: {
-    role: UserRole;
-    title: string;
-    description: string;
-    defaultId: string;
-    defaultName: string;
-    icon: any;
-    badgeColor: string;
-    permissions: string[];
-  }[] = [
+  // Primary Login Form State
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Check if redirected after successful registration
+  useEffect(() => {
+    if (searchParams.get("registered") === "true") {
+      setSuccessMessage("Account created successfully. Please sign in with your credentials.");
+    }
+  }, [searchParams]);
+
+  // Demo Persona Loading State
+  const [activeDemoRole, setActiveDemoRole] = useState<UserRole | null>(null);
+
+  // Demo Persona Configurations for SIH Jury Evaluation
+  const demoPersonas = [
     {
-      role: "citizen",
-      title: "Citizen / Landholder",
-      description: "Public access for titleholders, buyers, and surveyors to inspect parcels and cadastral maps.",
-      defaultId: "CIT-101",
-      defaultName: "Citizen User",
+      role: "citizen" as UserRole,
+      label: "Citizen Demo",
+      email: "citizen@bhusetu.demo",
       icon: UserCheck,
-      badgeColor: "bg-ink/10 text-ink border-ink/20",
-      permissions: ["Search & View Parcels", "Inspect GIS Boundaries", "View Public Inconsistencies", "Read Only"],
+      badge: "Public Access",
     },
     {
-      role: "revenue_officer",
-      title: "Revenue Officer (Patwari / Tehsildar)",
-      description: "Adjudicates land mutation requests, reviews spatial conflict flags, and seals determinations.",
-      defaultId: "OFF-102",
-      defaultName: "Officer Sharma",
+      role: "revenue_officer" as UserRole,
+      label: "Revenue Officer Demo",
+      email: "officer@bhusetu.demo",
       icon: FileCheck2,
-      badgeColor: "bg-ochre/20 text-ochre-dark border-ochre/30",
-      permissions: ["View All Parcels", "Review Conflict Matrix", "Submit Mutation Decisions", "SHA-256 Audit Signing"],
+      badge: "Revenue Circle",
     },
     {
-      role: "registrar",
-      title: "Sub-Registrar (NGDRS / IGRS)",
-      description: "Deed registration authority verifying transaction validity against PostGIS spatial cadastre.",
-      defaultId: "REG-201",
-      defaultName: "Sub-Registrar Verma",
+      role: "registrar" as UserRole,
+      label: "Sub-Registrar Demo",
+      email: "registrar@bhusetu.demo",
       icon: Building,
-      badgeColor: "bg-land/20 text-land border-land/30",
-      permissions: ["Deed Registration Review", "Title Mutation Approval", "Spatial Consistency Check", "Audit Ledger Access"],
+      badge: "Registry Desk",
     },
     {
-      role: "admin",
-      title: "System Administrator",
-      description: "Full administrative public infrastructure configuration, audit inspections, and overrides.",
-      defaultId: "ADM-999",
-      defaultName: "System Administrator",
+      role: "admin" as UserRole,
+      label: "Administrator Demo",
+      email: "admin@bhusetu.demo",
       icon: ShieldCheck,
-      badgeColor: "bg-brick/20 text-brick border-brick/30",
-      permissions: ["All Officer Permissions", "System Configuration", "Full Ledger Override", "Audit Log Inspection"],
+      badge: "DPI Governance",
     },
   ];
 
-  const handleLogin = async (roleToLogin: UserRole) => {
-    setLoggingIn(true);
-    try {
-      await login(roleToLogin, {
-        userId: customId || undefined,
-        name: customName || undefined,
-      });
-
-      if (roleToLogin === "citizen") {
+  const redirectForRole = (role: UserRole) => {
+    switch (role) {
+      case "citizen":
         router.push("/citizen");
-      } else {
+        break;
+      case "revenue_officer":
         router.push("/officer");
-      }
-    } catch (err) {
-      console.error("Login failed:", err);
-    } finally {
-      setLoggingIn(false);
+        break;
+      case "registrar":
+        router.push("/registrar");
+        break;
+      case "admin":
+        router.push("/admin");
+        break;
+      default:
+        router.push("/citizen");
+        break;
     }
   };
 
-  return (
-    <main className="min-h-screen bg-parchment flex flex-col justify-between">
-      <Navbar />
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
 
-      <div className="mx-auto max-w-4xl px-6 py-12 w-full">
+    const trimmedIdentifier = identifier.trim();
+    const trimmedPassword = password.trim();
+
+    if (!trimmedIdentifier || !trimmedPassword) {
+      setErrorMessage("Please enter both username/email and password.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const authUser = await loginWithCredentials(trimmedIdentifier, trimmedPassword);
+      redirectForRole(authUser.role);
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Invalid username/email or password.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDemoLogin = async (persona: (typeof demoPersonas)[0]) => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setActiveDemoRole(persona.role);
+
+    try {
+      await loginAsDevRole(persona.role);
+      redirectForRole(persona.role);
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Demo login failed");
+    } finally {
+      setActiveDemoRole(null);
+    }
+  };
+
+  const isAnyLoading = isSubmitting || activeDemoRole !== null;
+
+  return (
+    <div className="mx-auto max-w-xl px-4 sm:px-6 py-8 sm:py-12 w-full flex-1 flex flex-col justify-center">
+      {/* Main Login Card */}
+      <div className="bg-parchment p-6 sm:p-8 rounded-2xl plot-border-solid shadow-sm space-y-6">
         {/* Header */}
-        <div className="text-center max-w-xl mx-auto mb-10">
-          <div className="inline-flex items-center gap-2 font-mono text-xs font-semibold text-ochre-dark uppercase mb-2">
-            <Lock className="w-3.5 h-3.5" />
-            <span>DEVELOPMENT AUTHENTICATION</span>
+        <div className="text-center space-y-1.5 border-b border-ink/10 pb-5">
+          <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-ink text-parchment font-serif text-lg font-bold shadow-sm mb-1">
+            भू
           </div>
-          <h1 className="font-serif text-3xl sm:text-4xl font-bold text-ink">
-            Prototype Role Switcher
+          <div className="flex items-center justify-center gap-2">
+            <span className="font-serif text-xl sm:text-2xl font-bold tracking-tight text-ink">
+              BHU-SETU
+            </span>
+          </div>
+          <h1 className="font-serif text-lg sm:text-xl font-bold text-ink">
+            Digital Land Governance Platform
           </h1>
-          <p className="text-xs text-ink/70 mt-2 leading-relaxed">
-            Select a stakeholder persona to demonstrate role-based access control (RBAC),
-            authenticated mutation adjudication, and public citizen verification.
+          <p className="text-xs text-ink/65 max-w-sm mx-auto">
+            Secure access to unified land information and governance services.
           </p>
         </div>
 
-        {/* 4 Role Selection Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          {roleOptions.map((opt) => {
-            const isSelected = selectedRole === opt.role;
-            const isCurrent = user?.role === opt.role;
-            const Icon = opt.icon;
+        {/* Success Alert Banner (e.g. after citizen signup) */}
+        {successMessage && (
+          <div
+            role="status"
+            className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-lg text-xs text-emerald-800 flex items-start gap-2.5 animate-in fade-in duration-200"
+          >
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
+            <div>
+              <strong className="font-semibold">Success:</strong> {successMessage}
+            </div>
+          </div>
+        )}
 
-            return (
-              <div
-                key={opt.role}
-                onClick={() => setSelectedRole(opt.role)}
-                className={`p-6 rounded-xl cursor-pointer transition-all border-2 flex flex-col justify-between ${
-                  isSelected
-                    ? "bg-parchment-dark/60 border-ink shadow-md"
-                    : "bg-parchment border-ink/15 hover:border-ink/40 hover:shadow-sm"
-                }`}
+        {/* Error Alert Banner */}
+        {errorMessage && (
+          <div
+            role="alert"
+            className="p-3.5 bg-brick/10 border border-brick/30 rounded-lg text-xs text-brick flex items-start gap-2.5 animate-in fade-in duration-200"
+          >
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div>
+              <strong className="font-semibold">Authentication Failed:</strong> {errorMessage}
+            </div>
+          </div>
+        )}
+
+        {/* PRIMARY: Username/Email + Password Form */}
+        <form onSubmit={handleFormSubmit} className="space-y-4" noValidate>
+          <div>
+            <label
+              htmlFor="login-identifier"
+              className="block text-xs font-bold text-ink mb-1.5"
+            >
+              Email or Username
+            </label>
+            <input
+              id="login-identifier"
+              name="identifier"
+              type="text"
+              autoComplete="username"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="Enter your email or username"
+              disabled={isAnyLoading}
+              className="w-full bg-parchment px-3.5 py-2.5 rounded-lg border border-ink/20 font-sans text-xs sm:text-sm text-ink placeholder:text-ink/40 focus:outline-none focus:border-ink focus:ring-1 focus:ring-ink transition-colors disabled:opacity-50"
+              required
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label
+                htmlFor="login-password"
+                className="block text-xs font-bold text-ink"
               >
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-lg bg-ink text-parchment flex items-center justify-center font-bold">
-                        <Icon className="w-5 h-5 text-ochre" />
+                Password
+              </label>
+              <span className="text-[10px] text-ink/50" title="Password recovery available via administrative desk">
+                Forgot password?
+              </span>
+            </div>
+            <div className="relative">
+              <input
+                id="login-password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                disabled={isAnyLoading}
+                className="w-full bg-parchment px-3.5 py-2.5 rounded-lg border border-ink/20 font-mono text-xs sm:text-sm text-ink placeholder:text-ink/40 focus:outline-none focus:border-ink focus:ring-1 focus:ring-ink transition-colors pr-10 disabled:opacity-50"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={isAnyLoading}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink/50 hover:text-ink transition-colors p-1 rounded focus:outline-none focus:ring-1 focus:ring-ink"
+                title={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-1">
+            <button
+              type="submit"
+              disabled={isAnyLoading}
+              className="w-full bg-ink text-parchment py-3 rounded-lg text-xs sm:text-sm font-bold hover:bg-ink-light transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Signing in…</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="w-4 h-4 text-ochre" />
+                  <span>Sign In</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+
+        {/* Citizen Sign Up Link */}
+        <div className="text-center py-2 px-3 bg-ink/5 rounded-lg border border-ink/10 text-xs text-ink/80">
+          <span>Don&apos;t have an account? </span>
+          <Link
+            href="/signup"
+            className="text-ochre-dark font-bold hover:underline inline-flex items-center gap-1 ml-1"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>Create Citizen Account</span>
+          </Link>
+        </div>
+
+        {/* SECONDARY: SIH Demonstration & Evaluator Access */}
+        <div className="pt-5 border-t border-ink/10 space-y-3">
+          <div className="text-center space-y-0.5">
+            <h2 className="font-serif text-xs font-bold uppercase tracking-wider text-ink/70">
+              SIH Demo Accounts
+            </h2>
+            <p className="text-[11px] text-ink/50">
+              Quick evaluation access for presentation personas
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {demoPersonas.map((persona) => {
+              const Icon = persona.icon;
+              const isLoadingThis = activeDemoRole === persona.role;
+
+              return (
+                <button
+                  key={persona.role}
+                  type="button"
+                  onClick={() => handleDemoLogin(persona)}
+                  disabled={isAnyLoading}
+                  className="p-2.5 rounded-lg border border-ink/15 hover:border-ink hover:bg-ink/5 transition-all text-left bg-parchment flex items-center justify-between group disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-6 h-6 rounded bg-ink text-parchment flex items-center justify-center font-bold shrink-0">
+                      {isLoadingThis ? (
+                        <Loader2 className="w-3 h-3 animate-spin text-ochre" />
+                      ) : (
+                        <Icon className="w-3 h-3 text-ochre" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-ink group-hover:text-ochre-dark transition-colors truncate">
+                        {persona.label}
                       </div>
-                      <div>
-                        <h3 className="font-serif font-bold text-base text-ink">
-                          {opt.title}
-                        </h3>
-                        <div className="font-mono text-[10px] text-ink/50">
-                          {opt.defaultId} · {opt.defaultName}
-                        </div>
+                      <div className="text-[9px] text-ink/50 font-mono truncate">
+                        {persona.badge}
                       </div>
                     </div>
-
-                    {isCurrent && (
-                      <span className="text-[10px] bg-land/20 text-land border border-land/30 px-2 py-0.5 rounded-full font-bold">
-                        Active
-                      </span>
-                    )}
                   </div>
 
-                  <p className="text-xs text-ink/70 leading-relaxed mb-4">
-                    {opt.description}
-                  </p>
-
-                  <div className="space-y-1.5 border-t border-ink/10 pt-3 text-[11px] text-ink/80">
-                    {opt.permissions.map((perm, i) => (
-                      <div key={i} className="flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3 h-3 text-ochre-dark shrink-0" />
-                        <span>{perm}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-ink/10">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleLogin(opt.role);
-                    }}
-                    disabled={loggingIn}
-                    className={`w-full py-2.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-2 ${
-                      isSelected
-                        ? "bg-ink text-parchment hover:bg-ink-light"
-                        : "bg-parchment border border-ink/20 text-ink hover:bg-ink hover:text-parchment"
-                    }`}
-                  >
-                    {loggingIn && selectedRole === opt.role ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Authenticating with JWT…</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Sign In as {opt.title.split(" ")[0]}</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Prototype Disclaimer Card */}
-        <div className="bg-ink/5 border border-ink/10 rounded-xl p-5 text-xs text-ink/75 space-y-2">
-          <div className="flex items-center gap-2 font-semibold text-ink">
-            <Info className="w-4 h-4 text-ochre-dark" />
-            <span>SIH 2026 Prototype Authentication Architecture</span>
+                  <span className="text-ink/40 group-hover:text-ink group-hover:translate-x-0.5 transition-all text-xs font-bold shrink-0 ml-1">
+                    →
+                  </span>
+                </button>
+              );
+            })}
           </div>
-          <p className="leading-relaxed">
-            This prototype uses standard JWT Bearer token generation via the backend development endpoint (<code>POST /api/auth/dev-token</code>). In a live deployment, this gateway interfaces with MeriPehchaan (National SSO) and state revenue departmental SSO. Aadhaar and DigiLocker credentials are intentionally omitted for SIH compliance.
-          </p>
         </div>
       </div>
 
+      {/* Public Citizen Navigation Helper */}
+      <div className="mt-6 text-center text-xs text-ink/60">
+        Looking for public land records?{" "}
+        <Link
+          href="/citizen"
+          className="text-ochre-dark font-semibold hover:underline inline-flex items-center gap-1"
+        >
+          <Search className="w-3.5 h-3.5" />
+          <span>Search Land on Citizen Portal</span>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <main className="min-h-screen bg-parchment flex flex-col justify-between">
+      <Navbar />
+      <Suspense fallback={
+        <div className="mx-auto max-w-xl px-4 py-16 text-center text-xs text-ink/60 flex items-center justify-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading authentication portal…
+        </div>
+      }>
+        <LoginFormContent />
+      </Suspense>
+
+      {/* Footer */}
       <footer className="border-t border-ink/10 py-6 px-6 text-xs text-ink/50 text-center">
         Bhu-Setu · SIH 2026 — Integrated GIS based Digital Public Infrastructure for Land Governance
       </footer>
