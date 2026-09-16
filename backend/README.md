@@ -346,7 +346,7 @@ The Bhu-Setu API Gateway employs lightweight, standard JWT Bearer authentication
 3. **Protected Mutation Workflow**:
    - `POST /api/mutation/:ulpid` is protected by RBAC; client-provided `officer_id` is validated alongside authenticated user context.
    - Unauthorized attempts return standard `401 Unauthorized` or `403 Forbidden`.
-4. **Tamper-Evident SHA-256 Hash Chain**: Mutation decisions compute and chain cryptographic audit hashes (`audit_hash`) to the previous mutation record in PostgreSQL, ensuring non-repudiation and immutable auditability without blockchain overhead.
+4. **Tamper-Evident SHA-256 Hash Chain**: Mutation decisions compute and chain cryptographic audit hashes (`audit_hash`) to the previous mutation record in PostgreSQL, providing a traceable, tamper-evident audit record without blockchain overhead.
 5. **Development & Demo Utility**: Use `POST /api/auth/dev-token` with `{ "role": "<role_name>" }` to instantaneously generate JWT tokens for demonstrating different stakeholder viewpoints.
 6. **Production Outlook**: In full production deployment, the mock JWT generator would be backed by National Single Sign-On (MeriPehchaan) and departmental SSO providers. Aadhaar/DigiLocker integrations are explicitly avoided in this SIH prototype.
 

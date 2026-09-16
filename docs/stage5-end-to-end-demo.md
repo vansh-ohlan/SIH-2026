@@ -51,7 +51,7 @@ flowchart TD
 
     subgraph AuditLedger["5. Tamper-Evident SHA-256 Ledger"]
         G1 & G2 & G3 --> H["Cryptographic SHA-256 Hash Chain Sealed in PostgreSQL"]
-        H --> I["Immutable Statutory Receipt & Non-Repudiation"]
+        H --> I["Tamper-Evident Audit Record & Traceability"]
     end
 
     CitizenPillar --> DataPillar
@@ -69,7 +69,7 @@ The prototype includes four representative synthetic parcels engineered to demon
 | ULPIN / ULPID | Location | Titleholder | Scenario & Verification Findings | Status |
 | :--- | :--- | :--- | :--- | :--- |
 | **`PB-LDH-0042`** *(Primary Demo)* | Burj Littan, Ludhiana, Punjab | Ramesh Kumar | **Area Mismatch**: RoR records 1,250 sqm, while PostGIS cadastral polygon calculates 1,180 sqm (**70 sqm / 5.6% variance**). Flags discrepancy for officer adjudication. | `Needs Verification` / `Under Review` |
-| **`PB-LDH-0044`** | Burj Littan, Ludhiana, Punjab | Harpreet Kaur | **Clean Multi-Source Sync**: RoR (1,180 sqm), GIS Polygon (1,180 sqm), and NGDRS Deed match with 0.0% variance. Immediate statutory approval ready. | `Verified` |
+| **`PB-LDH-0044`** | Burj Littan, Ludhiana, Punjab | Harpreet Kaur | **Clean Multi-Source Sync**: Demo data is internally consistent across configured sources (RoR, GIS, NGDRS) with 0.0% variance. | `Verified` |
 | **`PB-LDH-0043`** | Gill, Ludhiana, Punjab | Suresh Singh | **Encumbrance / Tax Arrears**: Agricultural land with ₹3,200 municipal tax dues requiring clearance before mutation. | `Needs Verification` |
 | **`CH-SEC-1701`** | Sector 17, Chandigarh (UT) | Rajiv Mehta | **Commercial High-Density**: Multi-tenant parcel with master plan commercial zoning compliance. | `Verified` |
 
@@ -131,15 +131,35 @@ The prototype includes four representative synthetic parcels engineered to demon
 | **Multi-Source Data Harmonization** | 3 independent DPI adapters (State RoR, Cadastral GIS, NGDRS Registry) linked to atomic ULPIN. | `backend/src/services/parcelReconciliationService.ts`, `UnifiedParcelFlow.tsx` |
 | **Explainable Discrepancy Detection** | Rule-based engine comparing area, ownership, survey numbers, and liens with plain-English rationales. | `/api/parcel/:ulpid/reconciliation`, `frontend/components/UnifiedParcelFlow.tsx` |
 | **AI / OCR Decision Support Boundary** | Jamabandi RoR OCR document intelligence informs without replacing human authority. | `POST /api/ocr/extract`, statutory disclaimers on all pages |
-| **Statutory Non-Repudiation & Audit Trail** | Cryptographic SHA-256 hash chaining on every official determination stored in PostgreSQL. | `backend/src/services/hashChain.ts`, `backend/src/db/migrations/002_create_mutations.sql` |
-| **Citizen Empowerment & Transparency** | Clear, jargon-free lifecycle badges, verification request modals, and public search. | `frontend/app/parcel/[ulpid]/page.tsx`, `frontend/app/parcels/page.tsx` |
+| **Tamper-Evident Audit Record & Traceability** | Cryptographic SHA-256 hash chaining on every official determination stored in PostgreSQL. | `backend/src/audit/hashChain.ts`, `backend/src/db/migrations/003_create_mutations_table.sql` |
+| **Citizen Empowerment & Transparency** | Clear, jargon-free lifecycle badges, verification request modals, and public search. | `frontend/app/parcel/[ulpid]/page.tsx`, `frontend/app/citizen/page.tsx` |
 
 ---
 
-## 5. Summary of Key Files
+## 5. Judge Presentation Script (Step-by-Step)
 
-- **Unified Flow Component**: `frontend/components/UnifiedParcelFlow.tsx`
-- **Citizen Parcel Details**: `frontend/app/parcel/[ulpid]/page.tsx`
-- **Officer Mutation Adjudication**: `frontend/app/officer/mutations/page.tsx`
-- **Integration Test Suite**: `backend/tests/integration/stage5GovernanceWorkflow.test.ts`
-- **Demo Documentation**: `docs/stage5-end-to-end-demo.md`
+```
+"Namaste Judges. Today we present Bhu-Setu — an Integrated GIS-based Digital Public Infrastructure for Land Governance (SIH 2026 Problem Statement 26014).
+
+1. THE CONTEXT:
+   Fragmented land information can increase the effort required for verification and coordination across land-related services. In many regions, paper Jamabandi RoRs, Sub-Registrar deed records, and cadastral ground maps are managed in disparate silos.
+
+2. CITIZEN PARCEL VIEW (PB-LDH-0042):
+   - Here is parcel PB-LDH-0042 in Ludhiana, Punjab.
+   - At the top, you see our 3 DPI Adapters feeding into the atomic ULPIN: State RoR (1,250 sqm), Cadastral GIS (1,180 sqm), and NGDRS Registry.
+   - Our reconciliation engine flags a 70 sqm variance (5.6%) between the RoR and the digitized ground polygon.
+   - The citizen sees a clear, non-jargon status: 'Needs Verification', with a 6-point verification matrix and an interactive PostGIS map.
+   - The citizen can click 'Request Verification' to submit a demo inquiry with tracking ID REQ-2026-PB-XXXX.
+
+3. STATUTORY OFFICER ADJUDICATION:
+   - When the Revenue Officer logs in at /officer/mutations, they see the full multi-source discrepancy breakdown.
+   - Automated checks provide decision support only — statutory authority remains with authorized revenue officers.
+   - The officer logs official statutory findings, selects 'Needs Review' to dispatch a ground demarcator, and confirms the determination.
+
+4. TAMPER-EVIDENT SHA-256 AUDIT RECORD:
+   - Upon submission, Bhu-Setu seals the decision into PostgreSQL with a cryptographic SHA-256 audit hash chaining parcel_id, decision, officer_id, notes, timestamp, and previous_hash.
+   - This provides a traceable and tamper-evident audit record for administrative accountability.
+
+5. CONSISTENT CLEAN PARCEL DEMO (PB-LDH-0044):
+   - Switching to PB-LDH-0044 shows clean demo data that is internally consistent across all configured sources with zero variance."
+```

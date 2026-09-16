@@ -259,4 +259,71 @@ describe('Stage 5: End-to-End Parcel Governance Demo Workflow', () => {
 
     querySpy.mockRestore();
   });
+
+  it('Step 7: PB-LDH-0042 Data Consistency Audit (all 6 categories verified)', async () => {
+    const querySpy = jest.spyOn(db, 'query').mockImplementation(async (sql) => {
+      const sqlStr = typeof sql === 'string' ? sql : '';
+      if (sqlStr.includes('FROM parcels')) {
+        return {
+          rows: [mockParcel42],
+          rowCount: 1,
+          command: 'SELECT',
+          oid: 0,
+          fields: []
+        };
+      }
+      return { rows: [], rowCount: 0, command: 'SELECT', oid: 0, fields: [] };
+    });
+
+    const res = await request(app)
+      .get('/api/parcel/PB-LDH-0042/reconciliation')
+      .expect(200);
+
+    // Verify expected demo values for PB-LDH-0042
+    expect(res.body.ulpid).toBe('PB-LDH-0042');
+    expect(res.body.parcel_id).toBe('PARCEL-PB-LDH-0042');
+    expect(res.body.source_records.state_ror.area_sqm).toBe(1250);
+    expect(res.body.source_records.cadastral_gis.surveyed_area_sqm).toBe(1180);
+    expect(res.body.source_records.state_ror.khasra_no).toBe('142/3');
+    expect(res.body.source_records.state_ror.owner_name).toBe('Ramesh Kumar');
+    expect(res.body.source_records.registration_ngdrs.deed_number).toBe('PB-2024-REG-981');
+    expect(res.body.source_records.registration_ngdrs.encumbrance_status).toBe('none');
+    expect(res.body.source_records.municipal_zoning.land_use).toBe('Residential');
+    expect(res.body.record_status).toBe('needs_verification');
+
+    // Verify finding breakdown
+    const areaFinding = res.body.findings.find((f: any) => f.category === 'area');
+    expect(areaFinding).toBeDefined();
+    expect(areaFinding.difference).toContain('70');
+    expect(areaFinding.difference).toContain('5.6%');
+    expect(areaFinding.severity).toBe('medium');
+
+    querySpy.mockRestore();
+  });
+
+  it('Step 8: Officer mutation rejects empty notes with 400 validation error', async () => {
+    const querySpy = jest.spyOn(db, 'query').mockImplementation(async (sql) => {
+      const sqlStr = typeof sql === 'string' ? sql : '';
+      if (sqlStr.includes('FROM parcels')) {
+        return { rows: [mockParcel42], rowCount: 1, command: 'SELECT', oid: 0, fields: [] };
+      }
+      return { rows: [], rowCount: 0, command: 'SELECT', oid: 0, fields: [] };
+    });
+
+    const res = await request(app)
+      .post('/api/mutation/PB-LDH-0042')
+      .set('Authorization', `Bearer ${officerToken}`)
+      .send({
+        decision: 'needs_review',
+        officer_id: 'OFF-102',
+        notes: '' // Empty note
+      })
+      .expect(400);
+
+    expect(res.body.error).toBe('validation_error');
+    expect(res.body.message).toContain('Notes are required');
+
+    querySpy.mockRestore();
+  });
 });
+

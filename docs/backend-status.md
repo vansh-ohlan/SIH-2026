@@ -1,7 +1,7 @@
 # Bhu-Setu Backend Implementation Status
 
 **Current Branch**: `feature/stage4-parcel-gis-reconciliation`  
-**Current Milestone**: Stage 5 — End-to-End Parcel Governance Demo Workflow  
+**Current Milestone**: Stage 6 — Demo Hardening, Evidence Integrity & Judge Readiness  
 **Integration Branch**: `dev`  
 
 ---
@@ -24,11 +24,15 @@
   - **Judge Demo Switcher Bar**: Rapid test cases across Punjab (`PB-LDH-0042`, `PB-LDH-0044`, `PB-LDH-0043`) and Chandigarh (`CH-SEC-1701`).
   - **Unified Parcel Flow Banner (`UnifiedParcelFlow.tsx`)**: Visualizes 3 data adapter streams converging on atomic ULPIN anchor with variance metrics.
   - **6-Category Reconciliation Summary Matrix**: Real-time cross-validation across Area, Survey, Owner, Deed, Encumbrance, and Master Plan.
-  - **5-Step Decision Lifecycle Timeline**: Transparent progression from citizen submission to tamper-evident sealed ledger.
+  - **5-Step Decision Lifecycle Timeline**: Transparent progression from citizen submission to tamper-evident sealed audit record.
   - **Citizen Verification Request**: Interactive request modal with instant tracking receipt generation (`REQ-2026-PB-XXXX`).
-  - **Officer Mutation Adjudication Form**: Mandatory statutory findings log, confirmation safeguards, and SHA-256 audit receipt certificate with one-click copy.
-  - **Statutory Authority & Synthetic Disclaimers**: Clear decision-support boundaries and `[DEMO / SYNTHETIC DATA]` labels.
-- [x] **Comprehensive Test Suites**: Unit and integration tests covering OCR, decision support, PostGIS spatial queries, parcel cross-reconciliation, RBAC enforcement, and Stage 5 end-to-end governance workflow (`stage5GovernanceWorkflow.test.ts`).
+  - **Officer Mutation Adjudication Form**: Mandatory statutory findings log, confirmation safeguards, and SHA-256 audit receipt card with one-click copy.
+- [x] **Stage 6 Demo Hardening & Evidence Integrity**:
+  - **Claim Sanitization**: Removed unsupported statistics and absolute claims across UI and documentation; replaced with factual and technically accurate language.
+  - **Cryptographic Audit Verification (`verifyAuditHash`)**: Deterministic SHA-256 integrity verification helper function with full unit test coverage against tampered payloads.
+  - **Demo Data Consistency**: Audited and synchronized `PB-LDH-0042` (70 sqm / 5.6% variance) and `PB-LDH-0044` (consistent demo data across configured sources) across fixtures, services, and UI.
+  - **Demo Resilience & Safeguards**: Modal submission safety, clear `[DEMO / SYNTHETIC DATA]` labels, and robust error state handling.
+- [x] **Comprehensive Test Suites**: Unit and integration tests covering OCR, decision support, PostGIS spatial queries, parcel cross-reconciliation, RBAC enforcement, `verifyAuditHash`, and Stage 5/6 governance workflow (`stage5GovernanceWorkflow.test.ts`, `hashChain.test.ts`).
 
 ---
 

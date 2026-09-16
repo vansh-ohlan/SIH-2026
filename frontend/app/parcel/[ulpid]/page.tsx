@@ -543,8 +543,8 @@ export default function ParcelDetail({
                   </div>
                   <div className="text-[11px] text-ink/70">
                     {hasAreaMismatch
-                      ? "Dispatched to Revenue Officer queue for statutory decision and SHA-256 seal."
-                      : "Record verified with immutable ledger receipt."}
+                      ? "Dispatched to Revenue Officer queue for statutory decision and SHA-256 audit record."
+                      : "Record verified with tamper-evident audit record."}
                   </div>
                 </div>
               </div>
@@ -850,7 +850,7 @@ export default function ParcelDetail({
                   <ShieldCheck className="w-8 h-8 text-land mx-auto" />
                   <div className="font-bold text-sm text-ink">Zero Discrepancies Detected</div>
                   <p className="text-xs max-w-md mx-auto">
-                    All source registers (Jamabandi RoR, PostGIS Cadastral Polygon, and NGDRS Deeds) match with 100% data integrity.
+                    Demo data is internally consistent across the configured sources (Jamabandi RoR, PostGIS Cadastral Polygon, and NGDRS Deeds).
                   </p>
                 </div>
               )}
@@ -1106,7 +1106,7 @@ export default function ParcelDetail({
                   </div>
 
                   <div className="p-2.5 bg-blue-50 border border-blue-200 rounded text-[11px] text-blue-900 leading-relaxed">
-                    <strong>Demo Note:</strong> This generates a prototype verification tracking receipt. In production, this queues an inquiry in the Revenue Department citizen grievance portal.
+                    <strong>[DEMO / SYNTHETIC WORKFLOW]:</strong> This generates a prototype verification tracking receipt. In production, this queues an inquiry in the Revenue Department citizen grievance portal.
                   </div>
 
                   <div className="flex items-center justify-end gap-2 pt-2">
@@ -1129,7 +1129,7 @@ export default function ParcelDetail({
                       className="px-4 py-1.5 rounded bg-ink text-parchment font-bold hover:bg-ink-light flex items-center gap-1.5"
                     >
                       <Send className="w-3 h-3" />
-                      <span>Submit Request</span>
+                      <span>Submit Demo Request</span>
                     </button>
                   </div>
                 </div>
@@ -1139,11 +1139,16 @@ export default function ParcelDetail({
                     <div className="h-10 w-10 bg-land/20 text-land rounded-full flex items-center justify-center mx-auto">
                       <CheckCircle2 className="w-6 h-6" />
                     </div>
-                    <div className="font-serif text-base font-bold text-ink">
-                      Verification Request Logged
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span className="font-serif text-base font-bold text-ink">
+                        Verification Request Logged
+                      </span>
+                      <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-300">
+                        DEMO
+                      </span>
                     </div>
                     <p className="text-[11px] text-ink/70 max-w-xs mx-auto">
-                      Your inquiry has been submitted to the Ludhiana East Revenue Circle queue.
+                      Your inquiry has been simulated and queued for officer review in the prototype.
                     </p>
                   </div>
 
@@ -1158,7 +1163,7 @@ export default function ParcelDetail({
                     </div>
                     <div className="flex justify-between">
                       <span className="text-ink/60">Status:</span>
-                      <span className="text-land font-bold">Queued for Officer Review</span>
+                      <span className="text-land font-bold">Queued for Officer Review (Demo)</span>
                     </div>
                   </div>
 

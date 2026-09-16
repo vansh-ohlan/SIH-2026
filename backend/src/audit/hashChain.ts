@@ -28,6 +28,25 @@ export function generateAuditHash(input: HashChainInput): string {
 }
 
 /**
+ * Verifies whether a given audit record matches its expected SHA-256 hash.
+ * Reports true if tamper-evident integrity is intact, false if payload was altered.
+ */
+export function verifyAuditHash(record: HashChainInput & { audit_hash: string }): boolean {
+  if (!record || !record.audit_hash) {
+    return false;
+  }
+  const recomputed = generateAuditHash({
+    ulpid: record.ulpid,
+    decision: record.decision,
+    officer_id: record.officer_id,
+    notes: record.notes,
+    timestamp: record.timestamp,
+    previous_hash: record.previous_hash
+  });
+  return recomputed === record.audit_hash;
+}
+
+/**
  * Default genesis hash when no prior mutation exists for a parcel.
  */
 export const GENESIS_HASH = '0000000000000000000000000000000000000000000000000000000000000000';

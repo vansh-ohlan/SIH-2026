@@ -380,11 +380,11 @@ function MutationContent() {
             <div className="bg-ink text-parchment p-5 rounded-xl space-y-3">
               <div className="flex items-center gap-2 text-ochre font-mono text-xs font-bold uppercase">
                 <Hash className="w-4 h-4" />
-                <span>Tamper-Evident SHA-256 Ledger</span>
+                <span>Tamper-Evident SHA-256 Audit Trail</span>
               </div>
               <p className="text-[11px] text-parchment/80 leading-relaxed">
                 Every approved, rejected, or needs-review decision generates a cryptographic SHA-256 hash
-                chained to previous mutation records in PostgreSQL, guaranteeing statutory non-repudiation.
+                chained to previous mutation records in PostgreSQL, providing a traceable and tamper-evident audit record.
               </p>
             </div>
           </div>
@@ -551,7 +551,7 @@ function MutationContent() {
                     required
                   />
                   <span className="text-[10px] text-ink/50 mt-1 block">
-                    Statutory note will be hashed into the SHA-256 immutable audit receipt.
+                    Statutory note will be hashed into the SHA-256 tamper-evident audit receipt.
                   </span>
                 </div>
 
