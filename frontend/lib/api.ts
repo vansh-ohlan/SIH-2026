@@ -8,6 +8,8 @@ import {
   DevTokenResponse,
   AuthUser,
   UserRole,
+  RegisterRequest,
+  RegisterResponse,
   PilotRegion,
   RegionId,
   EncroachmentAlert,
@@ -247,6 +249,61 @@ export async function generateDevToken(
     expiresIn: "1h",
     user,
   };
+}
+
+// 7.1 Citizen Registration: POST /api/auth/register
+export async function registerCitizen(
+  payload: RegisterRequest
+): Promise<RegisterResponse> {
+  const { data, error, status } = await tryFetch<RegisterResponse>(`/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: payload.name.trim(),
+      email: payload.email.trim(),
+      username: payload.username.trim(),
+      password: payload.password,
+    }),
+  });
+
+  if (data && data.user) {
+    return data;
+  }
+
+  if (status === 0) {
+    throw new Error("Unable to connect to the registration server. Please verify the backend is running.");
+  }
+
+  throw new Error(error || "Registration failed. Please check your inputs and try again.");
+}
+
+// 7.2 User Login: POST /api/auth/login
+export async function loginUser(
+  identifier: string,
+  password: string
+): Promise<DevTokenResponse> {
+  const isEmail = identifier.includes("@");
+  const payload = {
+    username: isEmail ? undefined : identifier.trim(),
+    email: isEmail ? identifier.trim() : undefined,
+    password: password.trim(),
+  };
+
+  const { data, error, status } = await tryFetch<DevTokenResponse>(`/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (data && data.token) {
+    return data;
+  }
+
+  if (status === 0) {
+    throw new Error("Unable to connect to the authentication server. Please verify the backend is running.");
+  }
+
+  throw new Error(error || "Invalid username or password");
 }
 
 // 8. Get Authenticated Context: GET /api/auth/me
