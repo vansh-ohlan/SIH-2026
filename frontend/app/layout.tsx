@@ -24,6 +24,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 import { AuthProvider } from "@/lib/authContext";
+import AssistantFloatingButton from "@/components/assistant/AssistantFloatingButton";
 
 export const metadata: Metadata = {
   title: "Bhu-Setu | Unified Land Record Portal & GIS Infrastructure",
@@ -41,7 +42,10 @@ export default function RootLayout({
       <body
         className={`${fraunces.variable} ${plexSans.variable} ${plexMono.variable} font-sans antialiased`}
       >
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          {children}
+          <AssistantFloatingButton />
+        </AuthProvider>
       </body>
     </html>
   );

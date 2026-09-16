@@ -20,7 +20,8 @@ import {
   X,
   ShieldCheck,
   Building,
-  Server
+  Server,
+  Sparkles
 } from "lucide-react";
 
 export default function Navbar() {
@@ -53,12 +54,14 @@ export default function Navbar() {
           { href: "/officer/mutations", label: "Mutations", icon: FileCheck2 },
           { href: "/officer/risk", label: "Due-Diligence", icon: ShieldCheck },
           { href: "/map", label: "GIS Cadastre", icon: Layers },
+          { href: "/assistant", label: "Land Assistant", icon: Sparkles },
         ];
       case "registrar":
         return [
           { href: "/registrar", label: "Registrar Portal", icon: Building },
           { href: "/officer/mutations", label: "Mutations", icon: FileCheck2 },
           { href: "/map", label: "GIS Cadastre", icon: Layers },
+          { href: "/assistant", label: "Land Assistant", icon: Sparkles },
         ];
       case "admin":
         return [
@@ -66,6 +69,7 @@ export default function Navbar() {
           { href: "/officer", label: "Officer Hub", icon: Compass },
           { href: "/officer/conflicts", label: "Conflicts", icon: ShieldAlert },
           { href: "/map", label: "GIS Cadastre", icon: Layers },
+          { href: "/assistant", label: "Land Assistant", icon: Sparkles },
         ];
       case "citizen":
       default:
@@ -73,6 +77,7 @@ export default function Navbar() {
           { href: "/citizen", label: "Citizen Portal", icon: Search },
           { href: "/citizen/search", label: "Registry Lookup", icon: Compass },
           { href: "/map", label: "GIS Cadastre", icon: Layers },
+          { href: "/assistant", label: "Land Assistant", icon: Sparkles },
         ];
     }
   };
