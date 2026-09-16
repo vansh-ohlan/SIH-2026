@@ -1,0 +1,15 @@
+{
+  "document_id": "sample-001",
+  "source": "manual",
+  "state": "Rajasthan",
+  "district": "Jaipur",
+  "tehsil": "Jaipur",
+  "village": "Amer",
+  "document_type": "khata",
+  "language": "Hindi",
+  "script": "Devanagari",
+  "file_type": "pdf",
+  "acquisition_date": "2026-09-07",
+  "contains_personal_information": true,
+  "notes": "Placeholder sample for development and pipeline testing."
+}
