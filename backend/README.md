@@ -1,53 +1,5 @@
 # Bhu-Setu Backend API Gateway
 
-This repository contains two complementary backend implementations:
-
-## 1. Python FastAPI Backend (AI Land Intelligence)
-
-Minimal FastAPI backend that accepts land-record document uploads and delegates
-AI inference to the existing AI service. It also exposes the Conflict &
-Reconciliation Engine and the unified land intelligence endpoints.
-
-### Endpoints
-
-- `GET /api/v1/health` — Backend health check
-- `GET /api/v1/ai/ready` — AI service readiness check
-- `POST /api/v1/documents/upload` — Upload document for AI inference
-- `GET /api/v1/records/{record_id}/conflicts` — Conflicts for a persisted record
-- `GET /api/v1/land/{ulpin}` — Unified land intelligence for a ULPIN
-
-### Configuration
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AI_SERVICE_URL` | `http://localhost:8000` | AI service base URL |
-| `AI_TIMEOUT` | `60.0` | AI request timeout in seconds |
-| `MAX_UPLOAD_SIZE` | `20971520` | Max upload size in bytes (20 MB) |
-| `DATABASE_URL` | `sqlite:///./bhusetu_dev.db` | Persistence database URL |
-
-### Running
-
-```bash
-pip install -r requirements.txt
-python -m uvicorn backend.app.main:create_app --factory --host 0.0.0.0 --port 8000
-```
-
-### Testing
-
-```bash
-pytest -q backend/tests
-```
-
-### Architecture
-
-```
-Client → Backend API Gateway → AIInferenceClient → AI FastAPI Service → AnalysisResponse
-```
-
----
-
-## 2. Node.js / TypeScript Backend (GIS & Mutation)
-
 The backend service for **Bhu-Setu** (Smart India Hackathon 2026) — an integrated GIS-based Digital Public Infrastructure for Land Governance.
 
 This service acts as a non-disruptive integration layer connecting legacy state land records (Bhulekh, IGRS, municipal permissions), PostGIS spatial geometry, AI/ML OCR pipelines, and citizen/officer portals.
@@ -394,7 +346,7 @@ The Bhu-Setu API Gateway employs lightweight, standard JWT Bearer authentication
 3. **Protected Mutation Workflow**:
    - `POST /api/mutation/:ulpid` is protected by RBAC; client-provided `officer_id` is validated alongside authenticated user context.
    - Unauthorized attempts return standard `401 Unauthorized` or `403 Forbidden`.
-4. **Tamper-Evident SHA-256 Hash Chain**: Mutation decisions compute and chain cryptographic audit hashes (`audit_hash`) to the previous mutation record in PostgreSQL, ensuring non-repudiation and immutable auditability without blockchain overhead.
+4. **Tamper-Evident SHA-256 Hash Chain**: Mutation decisions compute and chain cryptographic audit hashes (`audit_hash`) to the previous mutation record in PostgreSQL, providing a traceable, tamper-evident audit record without blockchain overhead.
 5. **Development & Demo Utility**: Use `POST /api/auth/dev-token` with `{ "role": "<role_name>" }` to instantaneously generate JWT tokens for demonstrating different stakeholder viewpoints.
 6. **Production Outlook**: In full production deployment, the mock JWT generator would be backed by National Single Sign-On (MeriPehchaan) and departmental SSO providers. Aadhaar/DigiLocker integrations are explicitly avoided in this SIH prototype.
 
@@ -419,7 +371,7 @@ The Bhu-Setu API Gateway employs lightweight, standard JWT Bearer authentication
 - **Spatial Reference System**: **EPSG:4326 (WGS 84)** is used for all geometry columns (`geometry(Polygon, 4326)`).
 - **Indexing**: Spatial GiST index `idx_parcels_geometry` is applied for sub-millisecond bounding box and intersection queries.
 - **Centroid Queries**: Centroids for parcel searches are computed in PostGIS using `ROUND(ST_Y(ST_Centroid(geometry))::numeric, 4)` and `ROUND(ST_X(ST_Centroid(geometry))::numeric, 4)`.
-- **Tamper-Evident Audit Trail**: Mutation decisions calculate a SHA-256 hash chained to the previous mutation record for that parcel, ensuring cryptographic immutability without blockchain overhead.
+- **Tamper-Evident Audit Trail**: Mutation decisions calculate a SHA-256 hash chained to the previous mutation record for that parcel, providing a tamper-evident audit record without blockchain overhead.
 
 ---
 
@@ -435,3 +387,5 @@ The Bhu-Setu API Gateway employs lightweight, standard JWT Bearer authentication
 2. **Geometry Standard**: PostGIS `GEOMETRY(Polygon, 4326)` (WGS 84, standard GeoJSON `[longitude, latitude]` coordinate order).
 3. **GeoJSON Exposure**: `GET /api/map/parcels` returns standard GeoJSON `FeatureCollection` with `properties: { ulpid, land_use }` for direct frontend/GIS client consumption.
 4. **Backend Abstraction**: `GisService` in `src/gis/` provides clean bounding box (`calculateBBox`) utilities and integration types (`SpatialConflictResult`) without duplicating GIS spatial processing algorithms.
+
+

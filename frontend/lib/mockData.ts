@@ -7,6 +7,8 @@ import {
   RegionId,
   EncroachmentAlert,
   UtilityLine,
+  ParcelReconciliationReport,
+  ParcelReconciliationFinding,
 } from "./types";
 
 // ==========================================
@@ -45,7 +47,16 @@ export const PILOT_REGIONS: PilotRegion[] = [
 export const MOCK_PARCELS: Record<string, Parcel> = {
   // --- Punjab (Ludhiana) Parcels ---
   "PB-LDH-0042": {
+    parcel_id: "PARCEL-PB-LDH-0042",
     ulpid: "PB-LDH-0042",
+    ulpin: "PB-LDH-0042",
+    survey_no: "142/3",
+    khasra_no: "142/3",
+    village: "Burj Littan",
+    district: "Ludhiana",
+    state: "Punjab",
+    tehsil: "Ludhiana East",
+    record_status: "Conflict Detected",
     geometry: {
       type: "Polygon",
       coordinates: [
@@ -58,8 +69,10 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
         ],
       ],
     },
-    owner: { name: "Ramesh Kumar", since: "2011-04-12" },
+    owner: { name: "Ramesh Kumar", since: "2011-04-12", father_or_husband_name: "Suresh Kumar" },
     area_sqm: 1250,
+    ror_area_sqm: 1250,
+    surveyed_area_sqm: 1180,
     land_use: "Residential",
     valuation_band: "Band B (Standard Residential)",
     rate_per_sqm: 6500,
@@ -67,8 +80,36 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
     mutations: [
       { date: "2011-04-12", type: "Sale", from: "State", to: "Ramesh Kumar" },
     ],
+    source_records: {
+      state_ror: {
+        khewat_no: "74/82",
+        khatauni_no: "112",
+        khasra_no: "142/3",
+        declared_area_sqm: 1250,
+        owner_name: "Ramesh Kumar",
+        last_mutation_date: "2011-04-12",
+      },
+      cadastral_gis: {
+        polygon_area_sqm: 1180,
+        perimeter_m: 142.5,
+        centroid: [30.905, 75.855],
+        srid: 4326,
+        layer_name: "PB_Ludhiana_Cadastral_2026",
+      },
+      registration_ngdrs: {
+        deed_number: "DEED-2011-LDH-4821",
+        registration_date: "2011-04-12",
+        registered_party: "Ramesh Kumar",
+        encumbrance_status: "under_review",
+      },
+      municipal_zoning: {
+        zone_code: "ZONE-R2",
+        permitted_use: "Residential (Gair Mumkin Abadi)",
+        circle_rate_per_sqm: 6500,
+      },
+    },
     ledger_receipt: {
-      certificate_id: "CERT-PB-2026-0042-IMMUTABLE",
+      certificate_id: "CERT-PB-2026-0042-AUDIT",
       block_number: 104829,
       block_hash: "9f3a7c1e84d2b0e9a1c5f3b7d8e2a4c6b8d0e2f4a6c8b0d2e4f6a8b0c2d4e6f8",
       previous_hash: "3b8d0e2f4a6c8b0d2e4f6a8b0c2d4e6f89f3a7c1e84d2b0e9a1c5f3b7d8e2a4c",
@@ -76,11 +117,20 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       timestamp: "2026-03-01T06:30:00.000Z",
       signing_authority: "Directorate of Land Records & Revenue · Government of Punjab",
       jurisdiction: "Ludhiana West Sub-Division, Punjab",
-      verification_status: "verified_immutable",
+      verification_status: "verified_tamper_evident",
     },
   },
   "PB-LDH-0043": {
+    parcel_id: "PARCEL-PB-LDH-0043",
     ulpid: "PB-LDH-0043",
+    ulpin: "PB-LDH-0043",
+    survey_no: "142/4",
+    khasra_no: "142/4",
+    village: "Burj Littan",
+    district: "Ludhiana",
+    state: "Punjab",
+    tehsil: "Ludhiana East",
+    record_status: "Needs Verification",
     geometry: {
       type: "Polygon",
       coordinates: [
@@ -93,8 +143,10 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
         ],
       ],
     },
-    owner: { name: "Suresh Singh", since: "2016-07-02" },
+    owner: { name: "Suresh Singh", since: "2016-07-02", father_or_husband_name: "Jaswant Singh" },
     area_sqm: 980,
+    ror_area_sqm: 980,
+    surveyed_area_sqm: 980,
     land_use: "Agricultural",
     valuation_band: "Band C (Agricultural/Rural)",
     rate_per_sqm: 2400,
@@ -102,6 +154,34 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
     mutations: [
       { date: "2016-07-02", type: "Inheritance", from: "Gurdev Singh", to: "Suresh Singh" },
     ],
+    source_records: {
+      state_ror: {
+        khewat_no: "88/90",
+        khatauni_no: "145",
+        khasra_no: "142/4",
+        declared_area_sqm: 980,
+        owner_name: "Suresh Singh",
+        last_mutation_date: "2016-08-20",
+      },
+      cadastral_gis: {
+        polygon_area_sqm: 980,
+        perimeter_m: 125.0,
+        centroid: [30.905, 75.865],
+        srid: 4326,
+        layer_name: "PB_Ludhiana_Cadastral_2026",
+      },
+      registration_ngdrs: {
+        deed_number: "DEED-2016-LDH-1902",
+        registration_date: "2016-08-20",
+        registered_party: "Suresh Singh",
+        encumbrance_status: "clear",
+      },
+      municipal_zoning: {
+        zone_code: "ZONE-A1",
+        permitted_use: "Agricultural (Chahi / Irrigated)",
+        circle_rate_per_sqm: 2400,
+      },
+    },
     ledger_receipt: {
       certificate_id: "CERT-PB-2026-0043-ARREARS-PENDING",
       block_number: 104712,
@@ -115,7 +195,16 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
     },
   },
   "PB-LDH-0044": {
+    parcel_id: "PARCEL-PB-LDH-0044",
     ulpid: "PB-LDH-0044",
+    ulpin: "PB-LDH-0044",
+    survey_no: "142/5",
+    khasra_no: "142/5",
+    village: "Burj Littan",
+    district: "Ludhiana",
+    state: "Punjab",
+    tehsil: "Ludhiana East",
+    record_status: "Verified",
     geometry: {
       type: "Polygon",
       coordinates: [
@@ -128,8 +217,10 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
         ],
       ],
     },
-    owner: { name: "Harpreet Kaur", since: "2019-01-20" },
+    owner: { name: "Harpreet Kaur", since: "2019-01-20", father_or_husband_name: "Gurpreet Singh" },
     area_sqm: 1180,
+    ror_area_sqm: 1180,
+    surveyed_area_sqm: 1180,
     land_use: "Commercial",
     valuation_band: "Band A (Prime Commercial)",
     rate_per_sqm: 14500,
@@ -139,7 +230,7 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       { date: "2023-05-30", type: "Mortgage", from: "Harpreet Kaur", to: "State Bank of India" },
     ],
     ledger_receipt: {
-      certificate_id: "CERT-PB-2026-0044-IMMUTABLE",
+      certificate_id: "CERT-PB-2026-0044-AUDIT",
       block_number: 104880,
       block_hash: "5f3b7d8e2a4c6b8d0e2f4a6c8b0d2e4f6a8b0c2d4e6f89f3a7c1e84d2b0e9a1c",
       previous_hash: "0e2f4a6c8b0d2e4f6a8b0c2d4e6f89f3a7c1e84d2b0e9a1c5f3b7d8e2a4c6b8d",
@@ -147,7 +238,7 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       timestamp: "2026-02-10T11:45:00.000Z",
       signing_authority: "Directorate of Land Records & Revenue · Government of Punjab",
       jurisdiction: "Ludhiana Central Commercial Registry, Punjab",
-      verification_status: "verified_immutable",
+      verification_status: "verified_tamper_evident",
     },
   },
   "PB-LDH-0045": {
@@ -174,7 +265,7 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       { date: "2020-09-11", type: "Sale", from: "State", to: "Amanjot Bros. Pvt. Ltd." },
     ],
     ledger_receipt: {
-      certificate_id: "CERT-PB-2026-0045-IMMUTABLE",
+      certificate_id: "CERT-PB-2026-0045-AUDIT",
       block_number: 104650,
       block_hash: "2e4f6a8b0c2d4e6f89f3a7c1e84d2b0e9a1c5f3b7d8e2a4c6b8d0e2f4a6c8b0d",
       previous_hash: "8d0e2f4a6c8b0d2e4f6a8b0c2d4e6f89f3a7c1e84d2b0e9a1c5f3b7d8e2a4c6b",
@@ -182,13 +273,20 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       timestamp: "2026-01-05T09:20:00.000Z",
       signing_authority: "Directorate of Land Records & Revenue · Government of Punjab",
       jurisdiction: "Focal Point Industrial Zone, Ludhiana, Punjab",
-      verification_status: "verified_immutable",
+      verification_status: "verified_tamper_evident",
     },
   },
 
   // --- Chandigarh Pilot Parcels ---
   "CH-SEC-1701": {
+    parcel_id: "PARCEL-CH-SEC-1701",
     ulpid: "CH-SEC-1701",
+    ulpin: "CH-SEC-1701",
+    survey_no: "SEC-17-P1",
+    village: "Sector 17",
+    district: "Chandigarh",
+    state: "Chandigarh (UT)",
+    record_status: "Verified",
     geometry: {
       type: "Polygon",
       coordinates: [
@@ -203,6 +301,8 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
     },
     owner: { name: "Rajiv Walia & Associates", since: "2015-08-19" },
     area_sqm: 2400,
+    ror_area_sqm: 2400,
+    surveyed_area_sqm: 2400,
     land_use: "Commercial",
     valuation_band: "Band A (Prime Commercial)",
     rate_per_sqm: 18500,
@@ -210,8 +310,36 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
     mutations: [
       { date: "2015-08-19", type: "Allotment", from: "UT Estate Office", to: "Rajiv Walia" },
     ],
+    source_records: {
+      state_ror: {
+        khewat_no: "SEC17/01",
+        khatauni_no: "101",
+        khasra_no: "SEC-17-P1",
+        declared_area_sqm: 2400,
+        owner_name: "Rajiv Walia & Associates",
+        last_mutation_date: "2015-08-19",
+      },
+      cadastral_gis: {
+        polygon_area_sqm: 2400,
+        perimeter_m: 200.0,
+        centroid: [30.7335, 76.779],
+        srid: 4326,
+        layer_name: "CH_Sector17_Cadastral_2026",
+      },
+      registration_ngdrs: {
+        deed_number: "DEED-2015-CH-1701",
+        registration_date: "2015-08-19",
+        registered_party: "Rajiv Walia & Associates",
+        encumbrance_status: "clear",
+      },
+      municipal_zoning: {
+        zone_code: "ZONE-C1",
+        permitted_use: "Commercial Complex",
+        circle_rate_per_sqm: 18500,
+      },
+    },
     ledger_receipt: {
-      certificate_id: "CERT-CH-2026-1701-IMMUTABLE",
+      certificate_id: "CERT-CH-2026-1701-AUDIT",
       block_number: 89410,
       block_hash: "7d8e2a4c6b8d0e2f4a6c8b0d2e4f6a8b0c2d4e6f89f3a7c1e84d2b0e9a1c5f3b",
       previous_hash: "6c8b0d2e4f6a8b0c2d4e6f89f3a7c1e84d2b0e9a1c5f3b7d8e2a4c6b8d0e2f4a",
@@ -219,11 +347,18 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       timestamp: "2026-02-28T14:10:00.000Z",
       signing_authority: "Estate Office · Union Territory Administration, Chandigarh",
       jurisdiction: "Sector 17 Commercial Complex, Chandigarh (UT)",
-      verification_status: "verified_immutable",
+      verification_status: "verified_tamper_evident",
     },
   },
   "CH-SEC-1702": {
+    parcel_id: "PARCEL-CH-SEC-1702",
     ulpid: "CH-SEC-1702",
+    ulpin: "CH-SEC-1702",
+    survey_no: "SEC-17-GB2",
+    village: "Sector 17",
+    district: "Chandigarh",
+    state: "Chandigarh (UT)",
+    record_status: "Needs Verification",
     geometry: {
       type: "Polygon",
       coordinates: [
@@ -238,6 +373,8 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
     },
     owner: { name: "Chandigarh Urban Green Belt", since: "1966-11-01" },
     area_sqm: 6800,
+    ror_area_sqm: 6800,
+    surveyed_area_sqm: 6800,
     land_use: "Restriction Zone",
     valuation_band: "Band C (Agricultural/Rural)",
     rate_per_sqm: 1500,
@@ -245,6 +382,34 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
     mutations: [
       { date: "1966-11-01", type: "Gazette Notification", from: "Government", to: "Municipal Corporation" },
     ],
+    source_records: {
+      state_ror: {
+        khewat_no: "GB-01",
+        khatauni_no: "GB-01",
+        khasra_no: "SEC-17-GB2",
+        declared_area_sqm: 6800,
+        owner_name: "Chandigarh Urban Green Belt",
+        last_mutation_date: "1966-11-01",
+      },
+      cadastral_gis: {
+        polygon_area_sqm: 6800,
+        perimeter_m: 320.0,
+        centroid: [30.7345, 76.787],
+        srid: 4326,
+        layer_name: "CH_Sector17_GreenBelt_2026",
+      },
+      registration_ngdrs: {
+        deed_number: "DEED-1966-CH-GB2",
+        registration_date: "1966-11-01",
+        registered_party: "Municipal Corporation Chandigarh",
+        encumbrance_status: "clear",
+      },
+      municipal_zoning: {
+        zone_code: "ZONE-ENV",
+        permitted_use: "Statutory Urban Green Reserve",
+        circle_rate_per_sqm: 1500,
+      },
+    },
     ledger_receipt: {
       certificate_id: "CERT-CH-1966-1702-STATUTORY-PRESERVE",
       block_number: 102,
@@ -254,11 +419,18 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       timestamp: "1966-11-01T00:00:00.000Z",
       signing_authority: "Chief Administrator & Heritage Conservator · Chandigarh Administration",
       jurisdiction: "Protected Sector Green Belt Corridor, Chandigarh",
-      verification_status: "verified_immutable",
+      verification_status: "verified_tamper_evident",
     },
   },
   "CH-ITP-0301": {
+    parcel_id: "PARCEL-CH-ITP-0301",
     ulpid: "CH-ITP-0301",
+    ulpin: "CH-ITP-0301",
+    survey_no: "ITP-301",
+    village: "Kishangarh",
+    district: "Chandigarh",
+    state: "Chandigarh (UT)",
+    record_status: "Needs Verification",
     geometry: {
       type: "Polygon",
       coordinates: [
@@ -273,6 +445,8 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
     },
     owner: { name: "Horizon Infotech Hub", since: "2018-05-14" },
     area_sqm: 5100,
+    ror_area_sqm: 5100,
+    surveyed_area_sqm: 5100,
     land_use: "Industrial",
     valuation_band: "Band A (Prime Commercial)",
     rate_per_sqm: 16800,
@@ -280,6 +454,34 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
     mutations: [
       { date: "2018-05-14", type: "99-Yr Lease", from: "CH Chandigarh IT Park", to: "Horizon Infotech" },
     ],
+    source_records: {
+      state_ror: {
+        khewat_no: "ITP/301",
+        khatauni_no: "204",
+        khasra_no: "ITP-301",
+        declared_area_sqm: 5100,
+        owner_name: "Horizon Infotech Hub",
+        last_mutation_date: "2018-05-14",
+      },
+      cadastral_gis: {
+        polygon_area_sqm: 5100,
+        perimeter_m: 280.0,
+        centroid: [30.7405, 76.7775],
+        srid: 4326,
+        layer_name: "CH_ITPark_Cadastral_2026",
+      },
+      registration_ngdrs: {
+        deed_number: "DEED-2018-CH-ITP301",
+        registration_date: "2018-05-14",
+        registered_party: "Horizon Infotech Hub",
+        encumbrance_status: "clear",
+      },
+      municipal_zoning: {
+        zone_code: "ZONE-IT",
+        permitted_use: "Technology & Software Park",
+        circle_rate_per_sqm: 16800,
+      },
+    },
     ledger_receipt: {
       certificate_id: "CERT-CH-2026-0301-TAX-DEFAULT",
       block_number: 89350,
@@ -295,7 +497,14 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
 
   // --- Tamil Nadu (Sriperumbudur) Parcels ---
   "TN-SPR-0812": {
+    parcel_id: "PARCEL-TN-SPR-0812",
     ulpid: "TN-SPR-0812",
+    ulpin: "TN-SPR-0812",
+    survey_no: "812/1",
+    village: "Nemili",
+    district: "Kanchipuram",
+    state: "Tamil Nadu",
+    record_status: "Verified",
     geometry: {
       type: "Polygon",
       coordinates: [
@@ -310,6 +519,8 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
     },
     owner: { name: "Sundaram Component Works", since: "2014-03-22" },
     area_sqm: 7800,
+    ror_area_sqm: 7800,
+    surveyed_area_sqm: 7800,
     land_use: "Industrial",
     valuation_band: "Band A (Prime Commercial)",
     rate_per_sqm: 9800,
@@ -317,8 +528,35 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
     mutations: [
       { date: "2014-03-22", type: "SIPCOT Allotment", from: "SIPCOT TN", to: "Sundaram Works" },
     ],
+    source_records: {
+      state_ror: {
+        patta_no: "PATTA-SPR-812",
+        khasra_no: "812/1",
+        declared_area_sqm: 7800,
+        owner_name: "Sundaram Component Works",
+        last_mutation_date: "2014-03-22",
+      },
+      cadastral_gis: {
+        polygon_area_sqm: 7800,
+        perimeter_m: 350.0,
+        centroid: [12.9815, 79.9715],
+        srid: 4326,
+        layer_name: "TN_Sriperumbudur_Cadastral_2026",
+      },
+      registration_ngdrs: {
+        deed_number: "DEED-2014-TN-SPR812",
+        registration_date: "2014-03-22",
+        registered_party: "Sundaram Component Works",
+        encumbrance_status: "clear",
+      },
+      municipal_zoning: {
+        zone_code: "ZONE-IND",
+        permitted_use: "SIPCOT Heavy Engineering Corridor",
+        circle_rate_per_sqm: 9800,
+      },
+    },
     ledger_receipt: {
-      certificate_id: "CERT-TN-2026-0812-IMMUTABLE",
+      certificate_id: "CERT-TN-2026-0812-AUDIT",
       block_number: 142095,
       block_hash: "4c6b8d0e2f4a6c8b0d2e4f6a8b0c2d4e6f89f3a7c1e84d2b0e9a1c5f3b7d8e2a",
       previous_hash: "f3a7c1e84d2b0e9a1c5f3b7d8e2a4c6b8d0e2f4a6c8b0d2e4f6a8b0c2d4e6f89",
@@ -326,11 +564,18 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       timestamp: "2026-02-14T09:30:00.000Z",
       signing_authority: "Department of Revenue and Disaster Management · Government of Tamil Nadu",
       jurisdiction: "Sriperumbudur Taluk, Kanchipuram District, Tamil Nadu",
-      verification_status: "verified_immutable",
+      verification_status: "verified_tamper_evident",
     },
   },
   "TN-SPR-0813": {
+    parcel_id: "PARCEL-TN-SPR-0813",
     ulpid: "TN-SPR-0813",
+    ulpin: "TN-SPR-0813",
+    survey_no: "813/W",
+    village: "Nemili",
+    district: "Kanchipuram",
+    state: "Tamil Nadu",
+    record_status: "Needs Verification",
     geometry: {
       type: "Polygon",
       coordinates: [
@@ -345,6 +590,8 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
     },
     owner: { name: "Sriperumbudur Wetland Catchment", since: "1984-01-01" },
     area_sqm: 14200,
+    ror_area_sqm: 14200,
+    surveyed_area_sqm: 14200,
     land_use: "Eco-Sensitive",
     valuation_band: "Band C (Agricultural/Rural)",
     rate_per_sqm: 1200,
@@ -352,6 +599,33 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
     mutations: [
       { date: "1984-01-01", type: "Wetland Protection Order", from: "PWD Tamil Nadu", to: "Protected Waters" },
     ],
+    source_records: {
+      state_ror: {
+        patta_no: "PORAMBOKE-WATERBODY-813",
+        khasra_no: "813/W",
+        declared_area_sqm: 14200,
+        owner_name: "Sriperumbudur Wetland Catchment",
+        last_mutation_date: "1984-01-01",
+      },
+      cadastral_gis: {
+        polygon_area_sqm: 14200,
+        perimeter_m: 480.0,
+        centroid: [12.982, 79.9815],
+        srid: 4326,
+        layer_name: "TN_Sriperumbudur_Wetland_2026",
+      },
+      registration_ngdrs: {
+        deed_number: "GO-MS-1984-TN-PWD",
+        registration_date: "1984-01-01",
+        registered_party: "PWD Water Resources Dept",
+        encumbrance_status: "clear",
+      },
+      municipal_zoning: {
+        zone_code: "ZONE-CRZ-ECO",
+        permitted_use: "Protected Eco-Sensitive Water Catchment",
+        circle_rate_per_sqm: 1200,
+      },
+    },
     ledger_receipt: {
       certificate_id: "CERT-TN-1984-0813-WATERBODY-SANCTUARY",
       block_number: 1400,
@@ -361,11 +635,18 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
       timestamp: "1984-01-01T00:00:00.000Z",
       signing_authority: "Water Resources Department (PWD) · Government of Tamil Nadu",
       jurisdiction: "Sriperumbudur Lake Basin, Tamil Nadu",
-      verification_status: "verified_immutable",
+      verification_status: "verified_tamper_evident",
     },
   },
   "TN-SPR-0814": {
+    parcel_id: "PARCEL-TN-SPR-0814",
     ulpid: "TN-SPR-0814",
+    ulpin: "TN-SPR-0814",
+    survey_no: "814/2B",
+    village: "Nemili",
+    district: "Kanchipuram",
+    state: "Tamil Nadu",
+    record_status: "Conflict Detected",
     geometry: {
       type: "Polygon",
       coordinates: [
@@ -380,6 +661,8 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
     },
     owner: { name: "K. Venkatesan", since: "2008-11-10" },
     area_sqm: 3200,
+    ror_area_sqm: 3450,
+    surveyed_area_sqm: 3200,
     land_use: "Agricultural",
     valuation_band: "Band C (Agricultural/Rural)",
     rate_per_sqm: 2100,
@@ -387,6 +670,33 @@ export const MOCK_PARCELS: Record<string, Parcel> = {
     mutations: [
       { date: "2008-11-10", type: "Ancestral Patta", from: "Revenue Dept Kanchipuram", to: "K. Venkatesan" },
     ],
+    source_records: {
+      state_ror: {
+        patta_no: "PATTA-SPR-814-2B",
+        khasra_no: "814/2B",
+        declared_area_sqm: 3450,
+        owner_name: "K. Venkatesan",
+        last_mutation_date: "2008-11-10",
+      },
+      cadastral_gis: {
+        polygon_area_sqm: 3200,
+        perimeter_m: 230.0,
+        centroid: [12.9905, 79.9725],
+        srid: 4326,
+        layer_name: "TN_Sriperumbudur_Cadastral_2026",
+      },
+      registration_ngdrs: {
+        deed_number: "DEED-2008-TN-SPR814",
+        registration_date: "2008-11-10",
+        registered_party: "K. Venkatesan (Heir)",
+        encumbrance_status: "under_review",
+      },
+      municipal_zoning: {
+        zone_code: "ZONE-AGRI",
+        permitted_use: "Wetland Agricultural Buffer",
+        circle_rate_per_sqm: 2100,
+      },
+    },
     ledger_receipt: {
       certificate_id: "CERT-TN-2026-0814-ARREARS-FLAGGED",
       block_number: 141920,
@@ -867,3 +1177,109 @@ export const MOCK_UTILITIES: UtilityLine[] = [
     ],
   },
 ];
+
+// ==========================================
+// 7. Parcel-Centric Multi-Source Cross Reconciliation Data Provider
+// ==========================================
+export function getMockParcelReconciliation(ulpid: string): ParcelReconciliationReport {
+  const parcel = MOCK_PARCELS[ulpid];
+  const findings: ParcelReconciliationFinding[] = [];
+
+  const surveyNo = parcel?.survey_no || "142/3";
+  const ownerName = parcel?.owner?.name || "Ramesh Kumar";
+  const village = parcel?.village || (ulpid.startsWith("PB") ? "Burj Littan" : ulpid.startsWith("TN") ? "Nemili" : "Sector 17");
+  const district = parcel?.district || (ulpid.startsWith("PB") ? "Ludhiana" : ulpid.startsWith("TN") ? "Kanchipuram" : "Chandigarh");
+  const state = parcel?.state || (ulpid.startsWith("PB") ? "Punjab" : ulpid.startsWith("TN") ? "Tamil Nadu" : "Chandigarh (UT)");
+
+  // Compare RoR declared area vs Cadastral GIS calculated area
+  const rorArea = parcel?.ror_area_sqm ?? (parcel?.source_records?.state_ror?.declared_area_sqm ?? parcel?.area_sqm ?? 1000);
+  const gisArea = parcel?.surveyed_area_sqm ?? (parcel?.source_records?.cadastral_gis?.polygon_area_sqm ?? parcel?.area_sqm ?? 1000);
+  const areaDiff = Math.abs(rorArea - gisArea);
+
+  if (areaDiff > 0.01) {
+    findings.push({
+      field_compared: "Parcel Surface Extent (Area)",
+      source_a_name: "State RoR (Jamabandi)",
+      source_a_value: `${rorArea} sqm`,
+      source_b_name: "Bhu-Naksha GIS Polygon (EPSG:4326)",
+      source_b_value: `${gisArea} sqm`,
+      difference: `${areaDiff} sqm variance`,
+      reason: "Digitized ground cadastral polygon boundary differs from legacy paper Jamabandi extent.",
+      severity: "medium",
+      recommended_action: "review",
+    });
+  }
+
+  // Compare Titleholder vs NGDRS Registered Party
+  const deedParty = parcel?.source_records?.registration_ngdrs?.registered_party;
+  if (deedParty && parcel?.owner?.name && deedParty.trim().toLowerCase() !== parcel.owner.name.trim().toLowerCase()) {
+    findings.push({
+      field_compared: "Registered Titleholder / Malik",
+      source_a_name: "State RoR Record",
+      source_a_value: parcel.owner.name,
+      source_b_name: "NGDRS Registered Deed",
+      source_b_value: deedParty,
+      difference: `Title mismatch: "${parcel.owner.name}" vs "${deedParty}"`,
+      reason: "Deed registration record holder differs from active revenue ledger, indicating possible unrecorded succession.",
+      severity: "high",
+      recommended_action: "review",
+    });
+  }
+
+  // Encumbrance check
+  const encumbrance = parcel?.source_records?.registration_ngdrs?.encumbrance_status;
+  if (encumbrance === "under_review") {
+    findings.push({
+      field_compared: "Legal Encumbrance & Mutation Status",
+      source_a_name: "NGDRS Sub-Registrar Registry",
+      source_a_value: "Status: UNDER_REVIEW",
+      source_b_name: "Revenue Department Workflow",
+      source_b_value: "Pending Officer Adjudication",
+      difference: "Active adjudication pending in revenue registry",
+      reason: "Pending statutory boundary reconciliation or succession notice under officer review.",
+      severity: "medium",
+      recommended_action: "review",
+    });
+  }
+
+  const recordStatus = parcel?.record_status || (findings.length > 0 ? "Conflict Detected" : "Verified");
+
+  return {
+    parcel_id: parcel?.parcel_id || `PARCEL-${ulpid}`,
+    ulpid,
+    ulpin: parcel?.ulpin || ulpid,
+    survey_no: surveyNo,
+    owner_name: ownerName,
+    village,
+    district,
+    state,
+    record_status: recordStatus,
+    findings,
+    has_conflicts: findings.length > 0,
+    source_records: parcel?.source_records || {
+      state_ror: {
+        khasra_no: surveyNo,
+        declared_area_sqm: rorArea,
+        owner_name: ownerName,
+      },
+      cadastral_gis: {
+        polygon_area_sqm: gisArea,
+        perimeter_m: 140.0,
+        srid: 4326,
+      },
+      registration_ngdrs: {
+        deed_number: `DEED-AUTO-${ulpid}`,
+        registration_date: "2020-01-01",
+        registered_party: ownerName,
+        encumbrance_status: "clear",
+      },
+      municipal_zoning: {
+        zone_code: parcel?.land_use === "Commercial" ? "ZONE-C1" : "ZONE-R2",
+        permitted_use: parcel?.land_use || "Residential",
+        circle_rate_per_sqm: parcel?.rate_per_sqm || 6500,
+      },
+    },
+    confidence_score: findings.length === 0 ? 0.95 : 0.82,
+    disclaimer: "DEMO / SYNTHETIC DATA — Automated cross-reconciliation for hackathon demonstration. Authorized officials make final statutory determinations.",
+  };
+}

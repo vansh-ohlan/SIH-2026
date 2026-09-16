@@ -40,15 +40,22 @@ export interface LedgerReceipt {
   timestamp: string;
   signing_authority: string;
   jurisdiction: string;
-  verification_status: "verified_immutable" | "audit_pending";
+  verification_status: "verified_tamper_evident" | "audit_pending";
 }
 
 export interface Parcel {
+  parcel_id?: string;
   ulpid: string;
+  ulpin?: string;
   geometry: Geometry;
-  owner: { name: string; since: string };
+  owner: { name: string; since: string; father_or_husband_name?: string };
   area_sqm: number;
   land_use: string;
+  village?: string;
+  district?: string;
+  state?: string;
+  tehsil?: string;
+  record_status?: CitizenParcelStatus;
   tax_status: TaxStatus;
   mutations: Mutation[];
   ror_area_sqm?: number;
@@ -60,6 +67,65 @@ export interface Parcel {
   rate_per_sqm?: number;
   ledger_receipt?: LedgerReceipt;
 }
+
+export interface MultiSourceRecords {
+  state_ror?: {
+    khewat_no?: string;
+    khatauni_no?: string;
+    khasra_no?: string;
+    declared_area_sqm: number;
+    owner_name: string;
+    last_mutation_date: string;
+  };
+  cadastral_gis?: {
+    polygon_area_sqm: number;
+    perimeter_m?: number;
+    centroid: [number, number];
+    srid: number;
+    layer_name: string;
+  };
+  registration_ngdrs?: {
+    deed_number?: string;
+    registration_date?: string;
+    registered_party?: string;
+    encumbrance_status: "clear" | "mortgaged" | "disputed" | "under_review";
+  };
+  municipal_zoning?: {
+    zone_code: string;
+    permitted_use: string;
+    circle_rate_per_sqm: number;
+  };
+}
+
+export interface ParcelReconciliationFinding {
+  field_compared: string;
+  source_a_name: string;
+  source_a_value: string | number;
+  source_b_name: string;
+  source_b_value: string | number;
+  difference: string;
+  reason: string;
+  severity: Severity;
+  recommended_action: "review" | "verify" | "no_action";
+}
+
+export interface ParcelReconciliationReport {
+  parcel_id: string;
+  ulpid: string;
+  ulpin?: string;
+  survey_no: string;
+  owner_name: string;
+  village: string;
+  district: string;
+  state: string;
+  record_status: CitizenParcelStatus;
+  findings: ParcelReconciliationFinding[];
+  has_conflicts: boolean;
+  source_records: MultiSourceRecords;
+  confidence_score: number;
+  disclaimer: string;
+}
+
 
 export interface SearchResult {
   ulpid: string;
@@ -189,3 +255,35 @@ export interface OcrResult {
   bounding_boxes?: OcrBoundingBox[];
   audit_hash?: string;
 }
+
+export interface DecisionSupportFinding {
+  type: string;
+  description: string;
+  severity: Severity;
+  what_compared: string;
+  what_differs: string;
+  why_flagged: string;
+  source: string;
+}
+
+export interface DecisionSupportReport {
+  ulpid: string;
+  ocr_extracted: OcrResult;
+  stored_parcel: {
+    owner_name: string;
+    ror_area_sqm: number;
+    surveyed_area_sqm: number;
+    land_use: string;
+  } | null;
+  confidence_assessment: {
+    score: number;
+    status: "manual_verification_required" | "acceptable_for_review";
+    display_message: string;
+  };
+  anomalies: DecisionSupportFinding[];
+  recommended_review_status: "approved_candidate" | "needs_review" | "disputed";
+  disclaimer: string;
+}
+
+export type CitizenParcelStatus = "Verified" | "Under Review" | "Needs Verification" | "Conflict Detected";
+

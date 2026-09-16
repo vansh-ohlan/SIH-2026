@@ -11,20 +11,46 @@ export interface HashChainInput {
 }
 
 /**
+ * Produces a deterministic canonical serialization of the mutation audit record.
+ * Uses structured pipe-delimited fields with explicit key labels to eliminate serialization ambiguity.
+ */
+export function canonicalizeAuditPayload(input: HashChainInput): string {
+  return [
+    `prev:${input.previous_hash || ''}`,
+    `ulpid:${input.ulpid || ''}`,
+    `dec:${input.decision || ''}`,
+    `off:${input.officer_id || ''}`,
+    `notes:${(input.notes || '').trim()}`,
+    `ts:${input.timestamp || ''}`
+  ].join('|');
+}
+
+/**
  * Computes a deterministic SHA-256 hash chaining to the previous mutation hash.
  * Provides a tamper-evident audit trail for land parcel mutations.
  */
 export function generateAuditHash(input: HashChainInput): string {
-  const payload = [
-    input.previous_hash,
-    input.ulpid,
-    input.decision,
-    input.officer_id,
-    input.notes,
-    input.timestamp
-  ].join('|');
-
+  const payload = canonicalizeAuditPayload(input);
   return crypto.createHash('sha256').update(payload, 'utf8').digest('hex');
+}
+
+/**
+ * Verifies whether a given audit record matches its expected SHA-256 hash.
+ * Reports true if tamper-evident integrity is intact, false if payload was altered.
+ */
+export function verifyAuditHash(record: HashChainInput & { audit_hash: string }): boolean {
+  if (!record || !record.audit_hash) {
+    return false;
+  }
+  const recomputed = generateAuditHash({
+    ulpid: record.ulpid,
+    decision: record.decision,
+    officer_id: record.officer_id,
+    notes: record.notes,
+    timestamp: record.timestamp,
+    previous_hash: record.previous_hash
+  });
+  return recomputed === record.audit_hash;
 }
 
 /**
